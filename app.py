@@ -18,7 +18,7 @@ st.set_page_config(layout="wide")
 st.title("📈 Binance Testnet Live Paper Trading Bot")
 
 # Connect to Binance Futures Testnet
-client = Client(API_KEY, API_SECRET)
+client = Client(API_KEY, API_SECRET, testnet=True)
 client.FUTURES_URL = 'https://testnet.binancefuture.com/fapi'
 
 st.sidebar.success("✅ Connected to Binance Testnet")
