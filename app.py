@@ -4,6 +4,8 @@ import numpy as np
 import time
 from binance.client import Client
 from datetime import datetime
+from streamlit_autorefresh import st_autorefresh
+import altair as alt
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
@@ -19,7 +21,6 @@ st.title("📈 Binance Testnet Live Paper Trading Bot")
 
 # Connect to Binance Futures Testnet
 client = Client(API_KEY, API_SECRET, testnet=True)
-client.FUTURES_URL = 'https://testnet.binancefuture.com/fapi'
 
 st.sidebar.success("✅ Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
@@ -31,6 +32,10 @@ if 'positions' not in st.session_state:
     st.session_state.positions = {}
 if 'log' not in st.session_state:
     st.session_state.log = []
+if 'equity_log' not in st.session_state:
+    st.session_state.equity_log = []
+if 'pnl_log' not in st.session_state:
+    st.session_state.pnl_log = []
 
 # ======================= STRATEGY =======================
 def generate_signal(df):
@@ -61,9 +66,7 @@ def generate_signal(df):
 
 # ======================= MAIN LOOP =======================
 st.write("### Live Trades")
-placeholder = st.empty()
-st_autorefresh = st.empty()
-st_autorefresh.markdown(f"⏳ Auto-refreshing every {POLL_INTERVAL} seconds...")
+st_autorefresh(interval=POLL_INTERVAL * 1000, key="auto-refresh")
 
 for pair in TRADING_PAIRS:
     ticker = client.futures_klines(symbol=pair, interval=Client.KLINE_INTERVAL_1MINUTE, limit=100)
@@ -109,6 +112,16 @@ for pair in TRADING_PAIRS:
             'pnl': pnl,
             'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
+        st.session_state.pnl_log.append({
+            'time': datetime.now(),
+            'pnl': pnl
+        })
+
+# Log current equity value
+st.session_state.equity_log.append({
+    'time': datetime.now(),
+    'equity': st.session_state.capital
+})
 
 # ======================= UI =======================
 col1, col2, col3 = st.columns(3)
@@ -120,19 +133,23 @@ st.write("### Trade Log")
 log_df = pd.DataFrame(st.session_state.log)
 st.dataframe(log_df.tail(20), use_container_width=True)
 
-from streamlit_autorefresh import st_autorefresh
+st.write("### 📊 Equity Over Time")
+equity_df = pd.DataFrame(st.session_state.equity_log)
+if not equity_df.empty:
+    equity_chart = alt.Chart(equity_df).mark_line().encode(
+        x='time:T',
+        y='equity:Q'
+    ).properties(height=300)
+    st.altair_chart(equity_chart, use_container_width=True)
 
-# Refresh every POLL_INTERVAL seconds
-st_autorefresh(interval=POLL_INTERVAL * 1000, key="auto-refresh")
-
-# Metrics panel
-col1, col2, col3 = st.columns(3)
-col1.metric("💼 Capital", f"${st.session_state.capital:,.2f}")
-col2.metric("📊 Open Trades", len(st.session_state.positions))
-col3.metric("📈 Total Trades", len(st.session_state.log))
-
-st.write("### Trade Log")
-log_df = pd.DataFrame(st.session_state.log)
-st.dataframe(log_df.tail(20), use_container_width=True)
+st.write("### 📉 PnL Per Trade")
+pnl_df = pd.DataFrame(st.session_state.pnl_log)
+if not pnl_df.empty:
+    pnl_chart = alt.Chart(pnl_df).mark_bar().encode(
+        x='time:T',
+        y='pnl:Q',
+        color=alt.condition("datum.pnl >= 0", alt.value("green"), alt.value("red"))
+    ).properties(height=300)
+    st.altair_chart(pnl_chart, use_container_width=True)
 
 st.caption(f"🔁 Auto-refreshing every {POLL_INTERVAL} seconds.")
