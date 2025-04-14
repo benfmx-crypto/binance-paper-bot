@@ -10,7 +10,7 @@ from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
-from supabase import create_client, Client as SupabaseClient
+from supabase_py import create_client, SupabaseClient
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
