@@ -219,4 +219,4 @@ if not pnl_df.empty:
     ).properties(height=300)
     st.altair_chart(pnl_chart, use_container_width=True)
 
-st.caption(f"🔁 Auto-refreshing every {POLL_INTERVAL} seconds.")
+st.caption(f"🔁 Auto-refreshing every 10 seconds. (build check)")
