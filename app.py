@@ -24,7 +24,9 @@ st.title("📈 Binance Testnet Live Paper Trading Bot")
 
 # Google Sheets auth
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("google-credentials.json", scope)
+import json
+creds_dict = json.loads(st.secrets["GOOGLE_SHEETS_CREDS"])
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client_sheet = gspread.authorize(creds)
 sheet = client_sheet.open(SHEET_NAME)
 
