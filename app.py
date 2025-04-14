@@ -23,10 +23,12 @@ st.set_page_config(layout="wide")
 st.title("📈 Binance Testnet Live Paper Trading Bot")
 
 # Google Sheets auth
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds_dict = json.loads(st.secrets["GOOGLE_SHEETS_CREDS"])
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client_sheet = gspread.authorize(creds)
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
 
 try:
     sheet = client_sheet.open("streamlit-bot-data")
