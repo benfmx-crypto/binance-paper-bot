@@ -1,6 +1,4 @@
-# Streamlit Trading Bot with Supabase Backend
-
-# Streamlit Trading Bot with Supabase Backend (Google-Free)
+# Streamlit Trading Bot with Supabase via postgrest-py
 
 import streamlit as st
 import pandas as pd
@@ -10,7 +8,8 @@ from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
-from supabase_py import create_client, SupabaseClient
+from postgrest import PostgrestClient
+import httpx
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
@@ -28,7 +27,8 @@ st.set_page_config(layout="wide")
 st.title("📈 Binance Testnet Live Paper Trading Bot")
 client = Client(API_KEY, API_SECRET, testnet=True)
 
-supabase: SupabaseClient = create_client(SUPABASE_URL, SUPABASE_KEY)
+headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1", headers=headers)
 
 st.sidebar.success("✅ Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
@@ -36,12 +36,12 @@ st.sidebar.write("Pairs:", TRADING_PAIRS)
 # ======================= SUPABASE LOAD/SAVE =======================
 def load_state():
     try:
-        data = {}
+        state = {}
         for key in ["capital", "log", "positions", "equity_log", "pnl_log"]:
-            res = supabase.table("bot_state").select("value").eq("key", key).execute()
-            if res.data:
-                data[key] = res.data[0]['value']
-        return data
+            res = postgrest.from_("bot_state").select("value").eq("key", key).execute()
+            if res.status_code == 200 and res.json():
+                state[key] = res.json()[0]["value"]
+        return state
     except Exception as e:
         st.error(f"❌ Failed to load state from Supabase: {e}")
         return {}
@@ -49,7 +49,7 @@ def load_state():
 def save_state(state):
     try:
         for key, value in state.items():
-            supabase.table("bot_state").upsert({"key": key, "value": value}).execute()
+            postgrest.from_("bot_state").upsert({"key": key, "value": value}).execute()
     except Exception as e:
         st.error(f"❌ Failed to save state to Supabase: {e}")
 
