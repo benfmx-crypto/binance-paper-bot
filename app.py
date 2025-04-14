@@ -49,17 +49,34 @@ def read_sheet(tab):
     except:
         return pd.DataFrame()
 
-def write_sheet(tab, df):
-    try:
-        sheet_ = sheet.worksheet(tab)
-    except gspread.WorksheetNotFound:
-        sheet_ = sheet.add_worksheet(title=tab, rows="1000", cols="20")
+import time
+
+def write_sheet(tab, df, retries=3, delay=2):
+    for attempt in range(retries):
+        try:
+            sheet_ = sheet.worksheet(tab)
+            break
+        except gspread.WorksheetNotFound:
+            try:
+                sheet_ = sheet.add_worksheet(title=tab, rows="1000", cols="20")
+                break
+            except Exception as e:
+                if attempt < retries - 1:
+                    time.sleep(delay)
+                else:
+                    st.error(f"❌ Failed to create worksheet '{tab}': {e}")
+                    return
+        except Exception as e:
+            if attempt < retries - 1:
+                time.sleep(delay)
+            else:
+                st.error(f"❌ Sheet access error: {e}")
+                return
 
     if df.empty:
         sheet_.clear()
         return
 
-    # Clean the data
     df = df.replace({np.nan: "", None: ""})
     try:
         sheet_.update([df.columns.values.tolist()] + df.values.tolist())
