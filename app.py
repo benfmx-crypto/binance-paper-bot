@@ -8,6 +8,7 @@ from streamlit_autorefresh import st_autorefresh
 import altair as alt
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
@@ -16,7 +17,6 @@ TRADING_PAIRS = ['ETHUSDT', 'BTCUSDT', 'SOLUSDT', 'LINKUSDT']
 TRADE_PERCENT = 0.25
 LEVERAGE = 2
 POLL_INTERVAL = 10  # in seconds
-SHEET_NAME = "streamlit-trading bot"
 
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
@@ -24,24 +24,20 @@ st.title("📈 Binance Testnet Live Paper Trading Bot")
 
 # Google Sheets auth
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-import json
 creds_dict = json.loads(st.secrets["GOOGLE_SHEETS_CREDS"])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client_sheet = gspread.authorize(creds)
-SHEET_ID = "19ndpYJi6GUfMnKU0xeXoCqJqUYZgGNPct5zU3F4kqqQ"
-import time
 
 try:
     sheet = client_sheet.open("streamlit-bot-data")
 except Exception as e:
     st.warning(f"Sheet not found. Creating new one... ({e})")
-    sheet = client_sheet.create("streamlit-bot-data")
-    sheet.share("benfmx12@hotmail.com", perm_type='user', role='writer')  # optional
-    time.sleep(2)  # Wait for propagation
-    sheet = client_sheet.open("streamlit-bot-data")  # Try again after delay
+    created = client_sheet.create("streamlit-bot-data")
+    created.share("benfmx12@hotmail.com", perm_type='user', role='writer')
+    time.sleep(5)
+    sheet = client_sheet.open_by_key(created.id)
 
-
-
+# ======================= FUNCTIONS =======================
 def read_sheet(tab):
     try:
         data = sheet.worksheet(tab).get_all_records()
@@ -49,17 +45,27 @@ def read_sheet(tab):
     except:
         return pd.DataFrame()
 
-import time
-
-try:
-    sheet = client_sheet.open("streamlit-bot-data")
-except Exception as e:
-    st.warning(f"Sheet not found. Creating new one... ({e})")
-    created = client_sheet.create("streamlit-bot-data")
-    created.share("your@email.com", perm_type='user', role='writer')
-    time.sleep(5)  # <- Give Google time to register the file
-    sheet = client_sheet.open_by_key(created.id)  # Re-open it cleanly
-
+def write_sheet(tab, df, retries=3, delay=2):
+    for attempt in range(retries):
+        try:
+            sheet_ = sheet.worksheet(tab)
+            break
+        except gspread.WorksheetNotFound:
+            try:
+                sheet_ = sheet.add_worksheet(title=tab, rows="1000", cols="20")
+                break
+            except Exception as e:
+                if attempt < retries - 1:
+                    time.sleep(delay)
+                else:
+                    st.error(f"❌ Failed to create worksheet '{tab}': {e}")
+                    return
+        except Exception as e:
+            if attempt < retries - 1:
+                time.sleep(delay)
+            else:
+                st.error(f"❌ Sheet access error: {e}")
+                return
 
     if df.empty:
         sheet_.clear()
@@ -70,8 +76,6 @@ except Exception as e:
         sheet_.update([df.columns.values.tolist()] + df.values.tolist())
     except Exception as e:
         st.error(f"❌ Failed to update sheet '{tab}': {e}")
-
-
 
 # Binance API client
 client = Client(API_KEY, API_SECRET, testnet=True)
