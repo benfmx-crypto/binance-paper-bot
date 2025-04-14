@@ -39,7 +39,7 @@ def load_state():
         state = {}
         for key in ["capital", "log", "positions", "equity_log", "pnl_log"]:
             res = postgrest.from_("bot_state").select("value").eq("key", key).execute()
-            if res.data:
+            if hasattr(res, "data") and res.data:
                 state[key] = res.data[0]["value"]
         return state
     except Exception as e:
