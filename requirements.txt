@@ -5,3 +5,4 @@ numpy
 streamlit-autorefresh
 gspread
 oauth2client
+supabase-py==1.0.3
