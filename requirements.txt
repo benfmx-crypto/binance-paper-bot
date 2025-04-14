@@ -3,5 +3,6 @@ python-binance
 pandas
 numpy
 streamlit-autorefresh
-postgrest-py==0.10.6
-httpx==0.23.3
+altair
+postgrest-py
+httpx
