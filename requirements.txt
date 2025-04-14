@@ -4,4 +4,4 @@ pandas
 numpy
 streamlit-autorefresh
 postgrest-py==0.10.6
-httpx==0.26.0
+httpx==0.23.3
