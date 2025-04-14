@@ -6,6 +6,8 @@ from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
@@ -14,24 +16,46 @@ TRADING_PAIRS = ['ETHUSDT', 'BTCUSDT', 'SOLUSDT', 'LINKUSDT']
 TRADE_PERCENT = 0.25
 LEVERAGE = 2
 POLL_INTERVAL = 10  # in seconds
+SHEET_NAME = "streamlit-trading-bot"
 
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
 st.title("📈 Binance Testnet Live Paper Trading Bot")
 
-# Connect to Binance Futures Testnet
+# Google Sheets auth
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("google-credentials.json", scope)
+client_sheet = gspread.authorize(creds)
+sheet = client_sheet.open(SHEET_NAME)
+
+def read_sheet(tab):
+    try:
+        data = sheet.worksheet(tab).get_all_records()
+        return pd.DataFrame(data)
+    except:
+        return pd.DataFrame()
+
+def write_sheet(tab, df):
+    sheet_ = sheet.worksheet(tab)
+    sheet_.clear()
+    sheet_.update([df.columns.values.tolist()] + df.values.tolist())
+
+# Binance API client
 client = Client(API_KEY, API_SECRET, testnet=True)
 
 st.sidebar.success("✅ Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
 
-# ======================= STATE =======================
-if 'capital' not in st.session_state:
-    st.session_state.capital = 5000
-if 'positions' not in st.session_state:
-    st.session_state.positions = {}
-if 'log' not in st.session_state:
-    st.session_state.log = []
+# ======================= STATE SYNC FROM SHEET =======================
+capital_df = read_sheet("capital")
+st.session_state.capital = float(capital_df.iloc[0]["value"]) if not capital_df.empty else 5000
+
+log_df = read_sheet("log")
+st.session_state.log = log_df.to_dict("records") if not log_df.empty else []
+
+positions_df = read_sheet("positions")
+st.session_state.positions = {row['pair']: {"entry": float(row['entry']), "qty": float(row['qty'])} for _, row in positions_df.iterrows()} if not positions_df.empty else {}
+
 if 'equity_log' not in st.session_state:
     st.session_state.equity_log = []
 if 'pnl_log' not in st.session_state:
@@ -122,6 +146,15 @@ st.session_state.equity_log.append({
     'time': datetime.now(),
     'equity': st.session_state.capital
 })
+
+# ======================= WRITE BACK TO SHEETS =======================
+write_sheet("capital", pd.DataFrame([{"value": st.session_state.capital}]))
+write_sheet("log", pd.DataFrame(st.session_state.log))
+if st.session_state.positions:
+    pos_df = pd.DataFrame([{"pair": k, "entry": v["entry"], "qty": v["qty"]} for k, v in st.session_state.positions.items()])
+    write_sheet("positions", pos_df)
+else:
+    write_sheet("positions", pd.DataFrame(columns=["pair", "entry", "qty"]))
 
 # ======================= UI =======================
 col1, col2, col3 = st.columns(3)
