@@ -33,11 +33,10 @@ scope = [
 try:
     sheet = client_sheet.open("streamlit-bot-data")
 except Exception as e:
-    st.warning(f"Sheet not found. Creating new one... ({e})")
-    created = client_sheet.create("streamlit-bot-data")
-    created.share("benfmx12@hotmail.com", perm_type='user', role='writer')
-    time.sleep(5)
-    sheet = client_sheet.open_by_key(created.id)
+    st.error(f"❌ Could not open the sheet. Make sure it exists and is shared with the service account. ({e})")
+    st.stop()
+
+
 
 # ======================= FUNCTIONS =======================
 def read_sheet(tab):
