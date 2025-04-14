@@ -6,9 +6,9 @@ from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
+import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import json
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
@@ -28,17 +28,18 @@ scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
+creds_dict = json.loads(st.secrets["GOOGLE_SHEETS_CREDS"])
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client_sheet = gspread.authorize(creds)
 
-
+# Open existing sheet
 try:
     sheet = client_sheet.open("streamlit-bot-data")
 except Exception as e:
     st.error(f"❌ Could not open the sheet. Make sure it exists and is shared with the service account. ({e})")
     st.stop()
 
-
-
-# ======================= FUNCTIONS =======================
+# ======================= SHEET UTILS =======================
 def read_sheet(tab):
     try:
         data = sheet.worksheet(tab).get_all_records()
