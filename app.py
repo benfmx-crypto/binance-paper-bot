@@ -1,5 +1,7 @@
 # Streamlit Trading Bot with Supabase Backend
 
+# Streamlit Trading Bot with Supabase Backend (Google-Free)
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,7 +11,6 @@ from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
 from supabase import create_client, Client as SupabaseClient
-import json
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
