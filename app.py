@@ -24,13 +24,13 @@ SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
-st.title("📈 Binance Testnet Live Paper Trading Bot")
+st.title("\ud83d\udcc8 Binance Testnet Live Paper Trading Bot")
 client = Client(API_KEY, API_SECRET, testnet=True)
 
 headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1", headers=headers)
 
-st.sidebar.success("✅ Connected to Binance Testnet")
+st.sidebar.success("\u2705 Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
 
 # ======================= SUPABASE LOAD/SAVE =======================
@@ -43,7 +43,7 @@ def load_state():
                 state[key] = res.data[0]["value"]
         return state
     except Exception as e:
-        st.error(f"❌ Failed to load state from Supabase: {e}")
+        st.error(f"\u274c Failed to load state from Supabase: {e}")
         return {}
 
 def save_state(state):
@@ -51,7 +51,7 @@ def save_state(state):
         for key, value in state.items():
             postgrest.from_("bot_state").upsert({"key": key, "value": value}).execute()
     except Exception as e:
-        st.error(f"❌ Failed to save state to Supabase: {e}")
+        st.error(f"\u274c Failed to save state to Supabase: {e}")
 
 # Load state
 state = load_state()
@@ -103,7 +103,7 @@ for pair in TRADING_PAIRS:
     df.dropna(inplace=True)
 
     if df.empty:
-        st.warning(f"⚠️ Skipping {pair} due to insufficient data.")
+        st.warning(f"\u26a0\ufe0f Skipping {pair} due to insufficient data.")
         continue
 
     signal = generate_signal(df)
@@ -158,15 +158,15 @@ save_state({
 
 # ======================= UI =======================
 col1, col2, col3 = st.columns(3)
-col1.metric("💼 Capital", f"${st.session_state.capital:,.2f}")
-col2.metric("📊 Open Trades", len(st.session_state.positions))
-col3.metric("📈 Total Trades", len(st.session_state.log))
+col1.metric("\ud83d\udcbc Capital", f"${st.session_state.capital:,.2f}")
+col2.metric("\ud83d\udcca Open Trades", len(st.session_state.positions))
+col3.metric("\ud83d\udcc8 Total Trades", len(st.session_state.log))
 
 st.write("### Trade Log")
 log_df = pd.DataFrame(st.session_state.log)
 st.dataframe(log_df.tail(20), use_container_width=True)
 
-st.write("### 📊 Equity Over Time")
+st.write("### \ud83d\udcca Equity Over Time")
 equity_df = pd.DataFrame(st.session_state.equity_log)
 if not equity_df.empty:
     equity_chart = alt.Chart(equity_df).mark_line().encode(
@@ -175,7 +175,7 @@ if not equity_df.empty:
     ).properties(height=300)
     st.altair_chart(equity_chart, use_container_width=True)
 
-st.write("### 📉 PnL Per Trade (USDT)")
+st.write("### \ud83d\udcc9 PnL Per Trade (USDT)")
 pnl_df = pd.DataFrame(st.session_state.pnl_log)
 if not pnl_df.empty:
     pnl_chart = alt.Chart(pnl_df).mark_bar().encode(
@@ -185,4 +185,4 @@ if not pnl_df.empty:
     ).properties(height=300)
     st.altair_chart(pnl_chart, use_container_width=True)
 
-st.caption(f"🔁 Auto-refreshing every {POLL_INTERVAL} seconds.")
+st.caption(f"\ud83d\udd01 Auto-refreshing every {POLL_INTERVAL} seconds.")
