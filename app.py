@@ -29,12 +29,17 @@ creds_dict = json.loads(st.secrets["GOOGLE_SHEETS_CREDS"])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client_sheet = gspread.authorize(creds)
 SHEET_ID = "19ndpYJi6GUfMnKU0xeXoCqJqUYZgGNPct5zU3F4kqqQ"
+import time
+
 try:
     sheet = client_sheet.open("streamlit-bot-data")
 except Exception as e:
     st.warning(f"Sheet not found. Creating new one... ({e})")
     sheet = client_sheet.create("streamlit-bot-data")
-    sheet.share("benfmx12@hotmail.com", perm_type='user', role='writer')
+    sheet.share("benfmx12@hotmail.com", perm_type='user', role='writer')  # optional
+    time.sleep(2)  # Wait for propagation
+    sheet = client_sheet.open("streamlit-bot-data")  # Try again after delay
+
 
 
 def read_sheet(tab):
