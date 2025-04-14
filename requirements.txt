@@ -3,4 +3,5 @@ python-binance
 pandas
 numpy
 streamlit-autorefresh
-supabase-py==1.0.3
+postgrest-py==0.10.6
+httpx==0.26.0
