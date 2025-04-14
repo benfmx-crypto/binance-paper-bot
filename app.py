@@ -16,7 +16,7 @@ TRADING_PAIRS = ['ETHUSDT', 'BTCUSDT', 'SOLUSDT', 'LINKUSDT']
 TRADE_PERCENT = 0.25
 LEVERAGE = 2
 POLL_INTERVAL = 10  # in seconds
-SHEET_NAME = "streamlit-trading-bot"
+SHEET_NAME = "streamlit-trading bot"
 
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
