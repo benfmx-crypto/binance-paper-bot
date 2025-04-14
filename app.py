@@ -29,7 +29,7 @@ creds_dict = json.loads(st.secrets["GOOGLE_SHEETS_CREDS"])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client_sheet = gspread.authorize(creds)
 SHEET_ID = "19ndpYJi6GUfMnKU0xeXoCqJqUYZgGNPct5zU3F4kqqQ"
-sheet = client_sheet.open_by_url(https://docs.google.com/spreadsheets/d/19ndpYJi6GUfMnKU0xeXoCqJqUYZgGNPct5zU3F4kqqQ/edit?gid=0#gid=0)
+sheet = client_sheet.open_by_url("https://docs.google.com/spreadsheets/d/19ndpYJi6GUfMnKU0xeXoCqJqUYZgGNPct5zU3F4kqqQ/edit")
 
 
 def read_sheet(tab):
