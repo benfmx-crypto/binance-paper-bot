@@ -51,27 +51,15 @@ def read_sheet(tab):
 
 import time
 
-def write_sheet(tab, df, retries=3, delay=2):
-    for attempt in range(retries):
-        try:
-            sheet_ = sheet.worksheet(tab)
-            break
-        except gspread.WorksheetNotFound:
-            try:
-                sheet_ = sheet.add_worksheet(title=tab, rows="1000", cols="20")
-                break
-            except Exception as e:
-                if attempt < retries - 1:
-                    time.sleep(delay)
-                else:
-                    st.error(f"❌ Failed to create worksheet '{tab}': {e}")
-                    return
-        except Exception as e:
-            if attempt < retries - 1:
-                time.sleep(delay)
-            else:
-                st.error(f"❌ Sheet access error: {e}")
-                return
+try:
+    sheet = client_sheet.open("streamlit-bot-data")
+except Exception as e:
+    st.warning(f"Sheet not found. Creating new one... ({e})")
+    created = client_sheet.create("streamlit-bot-data")
+    created.share("your@email.com", perm_type='user', role='writer')
+    time.sleep(5)  # <- Give Google time to register the file
+    sheet = client_sheet.open_by_key(created.id)  # Re-open it cleanly
+
 
     if df.empty:
         sheet_.clear()
