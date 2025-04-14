@@ -1,4 +1,4 @@
-# Streamlit Trading Bot with Supabase via postgrest-py (with debugging)
+# Streamlit Trading Bot with Supabase via postgrest-py
 
 import streamlit as st
 import pandas as pd
@@ -53,6 +53,20 @@ def save_state(state):
     except Exception as e:
         st.error(f"❌ Failed to save state to Supabase: {e}")
 
+# Debug log
+
+def log_debug(pair, signal, price, note):
+    try:
+        postgrest.from_("debug_log").insert({
+            "time": datetime.now().isoformat(),
+            "pair": pair,
+            "signal": signal,
+            "price": price,
+            "note": note
+        }).execute()
+    except Exception as e:
+        st.warning(f"⚠️ Failed to log debug data for {pair}: {e}")
+
 # Load state
 state = load_state()
 st.session_state.capital = state.get("capital", 5000)
@@ -95,18 +109,14 @@ st.write("### Live Trades")
 st_autorefresh(interval=POLL_INTERVAL * 1000, key="auto-refresh")
 
 for pair in TRADING_PAIRS:
-    try:
-        ticker = client.futures_klines(symbol=pair, interval=Client.KLINE_INTERVAL_1MINUTE, limit=100)
-        df = pd.DataFrame(ticker, columns=["time", "open", "high", "low", "close", "volume", "ct", "qav", "trades", "tbv", "tqav", "ignore"])
-        df['close'] = df['close'].astype(float)
-        df['high'] = df['high'].astype(float)
-        df['low'] = df['low'].astype(float)
-        df['volume'] = df['volume'].astype(float)
-        df['time'] = pd.to_datetime(df['time'], unit='ms')
-        df.dropna(inplace=True)
-    except Exception as e:
-        st.warning(f"❗️ Error fetching data for {pair}: {e}")
-        continue
+    ticker = client.futures_klines(symbol=pair, interval=Client.KLINE_INTERVAL_1MINUTE, limit=100)
+    df = pd.DataFrame(ticker, columns=["time", "open", "high", "low", "close", "volume", "ct", "qav", "trades", "tbv", "tqav", "ignore"])
+    df['close'] = df['close'].astype(float)
+    df['high'] = df['high'].astype(float)
+    df['low'] = df['low'].astype(float)
+    df['volume'] = df['volume'].astype(float)
+    df['time'] = pd.to_datetime(df['time'], unit='ms')
+    df.dropna(inplace=True)
 
     if df.empty:
         st.warning(f"⚠️ Skipping {pair} due to insufficient data.")
@@ -117,7 +127,8 @@ for pair in TRADING_PAIRS:
     capital = st.session_state.capital
     size = round((capital * TRADE_PERCENT * LEVERAGE) / price, 3)
 
-    st.write(f"{pair}: Signal = {signal}, Price = {price}, Position = {st.session_state.positions.get(pair)}")
+    st.write(f"🔍 {pair}: Signal = {signal}, Position = {st.session_state.positions.get(pair, {}).get('side', 'None')}")
+    log_debug(pair, signal, price, st.session_state.positions.get(pair, {}).get('side', 'None'))
 
     if signal == 'BUY' and pair not in st.session_state.positions:
         st.session_state.positions[pair] = {'entry': price, 'qty': size, 'side': 'LONG'}
