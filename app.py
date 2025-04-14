@@ -1,4 +1,4 @@
-# Streamlit Trading Bot with Supabase via postgrest-py
+# Streamlit Trading Bot with Supabase via postgrest-py (with debugging)
 
 import streamlit as st
 import pandas as pd
@@ -95,14 +95,18 @@ st.write("### Live Trades")
 st_autorefresh(interval=POLL_INTERVAL * 1000, key="auto-refresh")
 
 for pair in TRADING_PAIRS:
-    ticker = client.futures_klines(symbol=pair, interval=Client.KLINE_INTERVAL_1MINUTE, limit=100)
-    df = pd.DataFrame(ticker, columns=["time", "open", "high", "low", "close", "volume", "ct", "qav", "trades", "tbv", "tqav", "ignore"])
-    df['close'] = df['close'].astype(float)
-    df['high'] = df['high'].astype(float)
-    df['low'] = df['low'].astype(float)
-    df['volume'] = df['volume'].astype(float)
-    df['time'] = pd.to_datetime(df['time'], unit='ms')
-    df.dropna(inplace=True)
+    try:
+        ticker = client.futures_klines(symbol=pair, interval=Client.KLINE_INTERVAL_1MINUTE, limit=100)
+        df = pd.DataFrame(ticker, columns=["time", "open", "high", "low", "close", "volume", "ct", "qav", "trades", "tbv", "tqav", "ignore"])
+        df['close'] = df['close'].astype(float)
+        df['high'] = df['high'].astype(float)
+        df['low'] = df['low'].astype(float)
+        df['volume'] = df['volume'].astype(float)
+        df['time'] = pd.to_datetime(df['time'], unit='ms')
+        df.dropna(inplace=True)
+    except Exception as e:
+        st.warning(f"❗️ Error fetching data for {pair}: {e}")
+        continue
 
     if df.empty:
         st.warning(f"⚠️ Skipping {pair} due to insufficient data.")
@@ -112,6 +116,8 @@ for pair in TRADING_PAIRS:
     price = df['close'].iloc[-1]
     capital = st.session_state.capital
     size = round((capital * TRADE_PERCENT * LEVERAGE) / price, 3)
+
+    st.write(f"{pair}: Signal = {signal}, Price = {price}, Position = {st.session_state.positions.get(pair)}")
 
     if signal == 'BUY' and pair not in st.session_state.positions:
         st.session_state.positions[pair] = {'entry': price, 'qty': size, 'side': 'LONG'}
