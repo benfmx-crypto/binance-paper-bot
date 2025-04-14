@@ -3,3 +3,5 @@ python-binance
 pandas
 numpy
 streamlit-autorefresh
+gspread
+oauth2client
