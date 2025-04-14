@@ -111,35 +111,35 @@ for pair in TRADING_PAIRS:
     capital = st.session_state.capital
     size = round((capital * TRADE_PERCENT * LEVERAGE) / price, 3)
 
-    if signal == 'BUY' and pair not in st.session_state.positions:
-        st.session_state.positions[pair] = {'entry': price, 'qty': size}
-        st.session_state.capital -= capital * TRADE_PERCENT
-        st.session_state.log.append({
-            'pair': pair,
-            'side': 'BUY',
-            'price': price,
-            'qty': size,
-            'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
+if signal == 'BUY' and pair not in st.session_state.positions:
+    trade_value = price * size
+    st.session_state.positions[pair] = {'entry': price, 'qty': size}
+    st.session_state.capital -= capital * TRADE_PERCENT
+    st.session_state.log.append({
+        'pair': pair,
+        'side': 'BUY',
+        'price': price,
+        'qty': size,
+        'value': round(trade_value, 2),
+        'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    })
 
-    elif signal == 'SELL' and pair in st.session_state.positions:
-        entry = st.session_state.positions[pair]['entry']
-        qty = st.session_state.positions[pair]['qty']
-        pnl_usdt = (price - entry) * qty * LEVERAGE
-        st.session_state.capital += (capital * TRADE_PERCENT) + pnl_usdt
-        del st.session_state.positions[pair]
-        st.session_state.log.append({
-            'pair': pair,
-            'side': 'SELL',
-            'price': price,
-            'qty': qty,
-            'pnl': pnl_usdt,
-            'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
-        st.session_state.pnl_log.append({
-            'time': datetime.now(),
-            'pnl': pnl_usdt
-        })
+elif signal == 'SELL' and pair in st.session_state.positions:
+    entry = st.session_state.positions[pair]['entry']
+    qty = st.session_state.positions[pair]['qty']
+    pnl_usdt = (price - entry) * qty * LEVERAGE
+    trade_value = price * qty
+    st.session_state.capital += (capital * TRADE_PERCENT) + pnl_usdt
+    del st.session_state.positions[pair]
+    st.session_state.log.append({
+        'pair': pair,
+        'side': 'SELL',
+        'price': price,
+        'qty': qty,
+        'value': round(trade_value, 2),
+        'pnl': pnl_usdt,
+        'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    })
 
 # Log current equity value
 st.session_state.equity_log.append({
