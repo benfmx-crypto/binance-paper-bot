@@ -37,7 +37,6 @@ except Exception as e:
     sheet.share("benfmx12@hotmail.com", perm_type='user', role='writer')
 
 
-
 def read_sheet(tab):
     try:
         data = sheet.worksheet(tab).get_all_records()
@@ -46,9 +45,13 @@ def read_sheet(tab):
         return pd.DataFrame()
 
 def write_sheet(tab, df):
-    sheet_ = sheet.worksheet(tab)
+    try:
+        sheet_ = sheet.worksheet(tab)
+    except gspread.WorksheetNotFound:
+        sheet_ = sheet.add_worksheet(title=tab, rows="1000", cols="20")
     sheet_.clear()
     sheet_.update([df.columns.values.tolist()] + df.values.tolist())
+
 
 # Binance API client
 client = Client(API_KEY, API_SECRET, testnet=True)
