@@ -31,9 +31,11 @@ client_sheet = gspread.authorize(creds)
 SHEET_ID = "19ndpYJi6GUfMnKU0xeXoCqJqUYZgGNPct5zU3F4kqqQ"
 try:
     sheet = client_sheet.open("streamlit-bot-data")
-except gspread.SpreadsheetNotFound:
+except Exception as e:
+    st.warning(f"Sheet not found. Creating new one... ({e})")
     sheet = client_sheet.create("streamlit-bot-data")
-    sheet.share("benfmx12@hotmail.com", perm_type='user', role='writer')  # Optional: share with yourself
+    sheet.share("benfmx12@hotmail.com", perm_type='user', role='writer')
+
 
 
 def read_sheet(tab):
