@@ -1,3 +1,5 @@
+# Streamlit Trading Bot with Supabase Backend
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -6,9 +8,8 @@ from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
+from supabase import create_client, Client as SupabaseClient
 import json
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
@@ -18,87 +19,46 @@ TRADE_PERCENT = 0.25
 LEVERAGE = 2
 POLL_INTERVAL = 10  # in seconds
 
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
 st.title("📈 Binance Testnet Live Paper Trading Bot")
-
-# Google Sheets auth
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-creds_dict = json.loads(st.secrets["GOOGLE_SHEETS_CREDS"])
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client_sheet = gspread.authorize(creds)
-
-# Open existing sheet
-try:
-    sheet = client_sheet.open("streamlit-bot-data")
-except Exception as e:
-    st.error(f"❌ Could not open the sheet. Make sure it exists and is shared with the service account. ({e})")
-    st.stop()
-
-# ======================= SHEET UTILS =======================
-def read_sheet(tab):
-    try:
-        data = sheet.worksheet(tab).get_all_records()
-        return pd.DataFrame(data)
-    except:
-        return pd.DataFrame()
-
-def write_sheet(tab, df, retries=3, delay=2):
-    for attempt in range(retries):
-        try:
-            sheet_ = sheet.worksheet(tab)
-            break
-        except gspread.WorksheetNotFound:
-            try:
-                sheet_ = sheet.add_worksheet(title=tab, rows="1000", cols="20")
-                break
-            except Exception as e:
-                if attempt < retries - 1:
-                    time.sleep(delay)
-                else:
-                    st.error(f"❌ Failed to create worksheet '{tab}': {e}")
-                    return
-        except Exception as e:
-            if attempt < retries - 1:
-                time.sleep(delay)
-            else:
-                st.error(f"❌ Sheet access error: {e}")
-                return
-
-    if df.empty:
-        sheet_.clear()
-        return
-
-    df = df.replace({np.nan: "", None: ""})
-    try:
-        sheet_.update([df.columns.values.tolist()] + df.values.tolist())
-    except Exception as e:
-        st.error(f"❌ Failed to update sheet '{tab}': {e}")
-
-# Binance API client
 client = Client(API_KEY, API_SECRET, testnet=True)
+
+supabase: SupabaseClient = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.sidebar.success("✅ Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
 
-# ======================= STATE SYNC FROM SHEET =======================
-capital_df = read_sheet("capital")
-st.session_state.capital = float(capital_df.iloc[0]["value"]) if not capital_df.empty else 5000
+# ======================= SUPABASE LOAD/SAVE =======================
+def load_state():
+    try:
+        data = {}
+        for key in ["capital", "log", "positions", "equity_log", "pnl_log"]:
+            res = supabase.table("bot_state").select("value").eq("key", key).execute()
+            if res.data:
+                data[key] = res.data[0]['value']
+        return data
+    except Exception as e:
+        st.error(f"❌ Failed to load state from Supabase: {e}")
+        return {}
 
-log_df = read_sheet("log")
-st.session_state.log = log_df.to_dict("records") if not log_df.empty else []
+def save_state(state):
+    try:
+        for key, value in state.items():
+            supabase.table("bot_state").upsert({"key": key, "value": value}).execute()
+    except Exception as e:
+        st.error(f"❌ Failed to save state to Supabase: {e}")
 
-positions_df = read_sheet("positions")
-st.session_state.positions = {row['pair']: {"entry": float(row['entry']), "qty": float(row['qty'])} for _, row in positions_df.iterrows()} if not positions_df.empty else {}
-
-if 'equity_log' not in st.session_state:
-    st.session_state.equity_log = []
-if 'pnl_log' not in st.session_state:
-    st.session_state.pnl_log = []
+# Load state
+state = load_state()
+st.session_state.capital = state.get("capital", 5000)
+st.session_state.log = state.get("log", [])
+st.session_state.positions = state.get("positions", {})
+st.session_state.equity_log = state.get("equity_log", [])
+st.session_state.pnl_log = state.get("pnl_log", [])
 
 # ======================= STRATEGY =======================
 def generate_signal(df):
@@ -164,20 +124,20 @@ for pair in TRADING_PAIRS:
     elif signal == 'SELL' and pair in st.session_state.positions:
         entry = st.session_state.positions[pair]['entry']
         qty = st.session_state.positions[pair]['qty']
-        pnl = (price - entry) * qty * LEVERAGE
-        st.session_state.capital += (capital * TRADE_PERCENT) + pnl
+        pnl_usdt = (price - entry) * qty * LEVERAGE
+        st.session_state.capital += (capital * TRADE_PERCENT) + pnl_usdt
         del st.session_state.positions[pair]
         st.session_state.log.append({
             'pair': pair,
             'side': 'SELL',
             'price': price,
             'qty': qty,
-            'pnl': pnl,
+            'pnl': pnl_usdt,
             'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
         st.session_state.pnl_log.append({
             'time': datetime.now(),
-            'pnl': pnl
+            'pnl': pnl_usdt
         })
 
 # Log current equity value
@@ -186,14 +146,14 @@ st.session_state.equity_log.append({
     'equity': st.session_state.capital
 })
 
-# ======================= WRITE BACK TO SHEETS =======================
-write_sheet("capital", pd.DataFrame([{"value": st.session_state.capital}]))
-write_sheet("log", pd.DataFrame(st.session_state.log))
-if st.session_state.positions:
-    pos_df = pd.DataFrame([{"pair": k, "entry": v["entry"], "qty": v["qty"]} for k, v in st.session_state.positions.items()])
-    write_sheet("positions", pos_df)
-else:
-    write_sheet("positions", pd.DataFrame(columns=["pair", "entry", "qty"]))
+# ======================= SAVE TO SUPABASE =======================
+save_state({
+    "capital": st.session_state.capital,
+    "log": st.session_state.log,
+    "positions": st.session_state.positions,
+    "equity_log": st.session_state.equity_log,
+    "pnl_log": st.session_state.pnl_log
+})
 
 # ======================= UI =======================
 col1, col2, col3 = st.columns(3)
@@ -214,7 +174,7 @@ if not equity_df.empty:
     ).properties(height=300)
     st.altair_chart(equity_chart, use_container_width=True)
 
-st.write("### 📉 PnL Per Trade")
+st.write("### 📉 PnL Per Trade (USDT)")
 pnl_df = pd.DataFrame(st.session_state.pnl_log)
 if not pnl_df.empty:
     pnl_chart = alt.Chart(pnl_df).mark_bar().encode(
