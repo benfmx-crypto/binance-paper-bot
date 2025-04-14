@@ -54,8 +54,18 @@ def write_sheet(tab, df):
         sheet_ = sheet.worksheet(tab)
     except gspread.WorksheetNotFound:
         sheet_ = sheet.add_worksheet(title=tab, rows="1000", cols="20")
-    sheet_.clear()
-    sheet_.update([df.columns.values.tolist()] + df.values.tolist())
+
+    if df.empty:
+        sheet_.clear()
+        return
+
+    # Clean the data
+    df = df.replace({np.nan: "", None: ""})
+    try:
+        sheet_.update([df.columns.values.tolist()] + df.values.tolist())
+    except Exception as e:
+        st.error(f"❌ Failed to update sheet '{tab}': {e}")
+
 
 
 # Binance API client
