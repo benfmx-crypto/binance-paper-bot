@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import time
+import asyncio
 from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
@@ -30,34 +31,15 @@ client = Client(API_KEY, API_SECRET, testnet=True)
 headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1", headers=headers)
 
-# ✅ Manual test insert to debug_log
-try:
-    debug_test = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "pair": "TEST",
-        "time": "00:00:00",
-        "latest_macd": 1.23,
-        "latest_signal": 1.20,
-        "latest_rsi": 55.0,
-        "previous_macd": 1.10,
-        "previous_sign": 1.15,
-        "decision": "BUY"
-    }
-    postgrest.from_("debug_log").insert(debug_test).execute()
-    st.success("✅ Debug log test entry sent to Supabase!")
-except Exception as e:
-    st.error(f"❌ Debug log test failed: {e}")
-
 st.sidebar.success("✅ Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
 
-
 # ======================= SUPABASE LOAD/SAVE =======================
-def load_state():
+async def load_state():
     try:
         state = {}
         for key in ["capital", "log", "positions", "equity_log", "pnl_log"]:
-            res = postgrest.from_("bot_state").select("value").eq("key", key).execute()
+            res = await postgrest.from_("bot_state").select("value").eq("key", key).execute()
             if hasattr(res, "data") and res.data:
                 state[key] = res.data[0]["value"]
         return state
@@ -65,34 +47,27 @@ def load_state():
         st.error(f"❌ Failed to load state from Supabase: {e}")
         return {}
 
-def save_state(state):
+async def save_state(state):
     try:
         for key, value in state.items():
-            postgrest.from_("bot_state").upsert({"key": key, "value": value}).execute()
+            await postgrest.from_("bot_state").upsert({"key": key, "value": value}).execute()
     except Exception as e:
         st.error(f"❌ Failed to save state to Supabase: {e}")
 
-# ✅ DEBUG LOGGER
-
-def log_debug_signal(pair, df, signal):
+async def log_debug(pair, signal, rsi, macd, signal_line):
     try:
-        row = {
-            "timestamp": datetime.now().isoformat(),
+        await postgrest.from_("debug_log").insert({
             "pair": pair,
-            "time": df["time"].iloc[-1].isoformat(),
-            "latest_macd": float(df["MACD"].iloc[-1]),
-            "latest_signal": float(df["Signal"].iloc[-1]),
-            "latest_rsi": float(df["RSI"].iloc[-1]),
-            "previous_macd": float(df["MACD"].iloc[-2]),
-            "previous_signal": float(df["Signal"].iloc[-2]),
-            "decision": signal
-        }
-        postgrest.from_("debug_log").insert(row).execute()
+            "signal": signal,
+            "rsi": rsi,
+            "macd": macd,
+            "macd_signal": signal_line,
+            "timestamp": datetime.now().isoformat()
+        }).execute()
     except Exception as e:
         st.warning(f"⚠️ Failed to insert debug log: {e}")
 
-# Load state
-state = load_state()
+state = asyncio.run(load_state())
 st.session_state.capital = state.get("capital", 5000)
 st.session_state.log = state.get("log", [])
 st.session_state.positions = state.get("positions", {})
@@ -115,18 +90,18 @@ def generate_signal(df):
     df.dropna(inplace=True)
 
     if len(df) < 2:
-        return 'HOLD'
+        return 'HOLD', df
 
     latest = df.iloc[-1]
     previous = df.iloc[-2]
 
     if latest['MACD'] > latest['Signal'] and previous['MACD'] <= previous['Signal'] and latest['RSI'] > 55:
-        return 'BUY'
+        return 'BUY', df
     elif latest['MACD'] < latest['Signal'] and previous['MACD'] >= previous['Signal'] and latest['RSI'] < 45:
-        return 'SHORT'
+        return 'SHORT', df
     elif latest['RSI'] > 70 or latest['RSI'] < 30:
-        return 'EXIT'
-    return 'HOLD'
+        return 'EXIT', df
+    return 'HOLD', df
 
 # ======================= MAIN LOOP =======================
 st.write("### Live Trades")
@@ -146,10 +121,11 @@ for pair in TRADING_PAIRS:
         st.warning(f"⚠️ Skipping {pair} due to insufficient data.")
         continue
 
-    signal = generate_signal(df)
-    log_debug_signal(pair, df, signal)
+    signal, df = generate_signal(df)
+    latest = df.iloc[-1]
+    asyncio.run(log_debug(pair, signal, latest['RSI'], latest['MACD'], latest['Signal']))
 
-    price = df['close'].iloc[-1]
+    price = latest['close']
     capital = st.session_state.capital
     size = round((capital * TRADE_PERCENT * LEVERAGE) / price, 3)
 
@@ -204,14 +180,13 @@ st.session_state.equity_log.append({
     'equity': st.session_state.capital
 })
 
-# ======================= SAVE TO SUPABASE =======================
-save_state({
+asyncio.run(save_state({
     "capital": st.session_state.capital,
     "log": st.session_state.log,
     "positions": st.session_state.positions,
     "equity_log": st.session_state.equity_log,
     "pnl_log": st.session_state.pnl_log
-})
+}))
 
 # ======================= UI =======================
 col1, col2, col3 = st.columns(3)
@@ -243,3 +218,4 @@ if not pnl_df.empty:
     st.altair_chart(pnl_chart, use_container_width=True)
 
 st.caption(f"🔁 Auto-refreshing every {POLL_INTERVAL} seconds.")
+
