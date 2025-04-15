@@ -4,5 +4,5 @@ pandas
 numpy
 streamlit-autorefresh
 altair
-postgrest-py
 httpx
+postgrest-py

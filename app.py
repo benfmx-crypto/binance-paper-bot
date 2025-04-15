@@ -8,8 +8,8 @@ from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
-from postgrest import PostgrestClient  # ✅ THIS is the correct one
-import httpx
+from postgrest import PostgrestClient  # ✅ Only this one
+
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
