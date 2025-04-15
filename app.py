@@ -11,6 +11,11 @@ import altair as alt
 from postgrest import PostgrestClient
 import httpx
 
+if "SUPABASE_URL" not in st.secrets or "SUPABASE_KEY" not in st.secrets:
+    st.error("Supabase secrets missing!")
+    st.stop()
+
+
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
 API_SECRET = 'SZTzO0qUanD1mRv3bbKLVZRogeYJuIqjC1hxdW52cX6u8MoaemyTMuuiBx4XIamP'
