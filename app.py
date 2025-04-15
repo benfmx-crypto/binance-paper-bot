@@ -8,12 +8,12 @@ from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
-from postgrest import PostgrestClient  # ✅ Only this one
-
+from postgrest import PostgrestClient
+import asyncio
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
-API_SECRET = 'SZTzO0qUanD1mRv3bbKLVZRogeYJuIqjC1hxdW52cX6u8MoaemyTMuuiBx4XIamP'
+API_SECRET = 'SZTzO0qUanD1mRv3bbKLVZRogeYJuIqjC1hxdW52cX6u8MoaemyTM7Bswgu14ObvYKg'
 TRADING_PAIRS = ['ETHUSDT', 'BTCUSDT', 'SOLUSDT', 'LINKUSDT']
 TRADE_PERCENT = 0.25
 LEVERAGE = 2
@@ -37,10 +37,14 @@ st.sidebar.write("Pairs:", TRADING_PAIRS)
 def load_state():
     try:
         state = {}
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         for key in ["capital", "log", "positions", "equity_log", "pnl_log"]:
-            res = postgrest.from_("bot_state").select("value").eq("key", key).execute()
-            if res and res.data:
-                state[key] = res.data[0]["value"]
+            res = loop.run_until_complete(
+                postgrest.from_("bot_state").select("value").eq("key", key).execute()
+            )
+            if res and res[1]:
+                state[key] = res[1][0]["value"]
         return state
     except Exception as e:
         st.error(f"❌ Failed to load state from Supabase: {e}")
@@ -48,21 +52,29 @@ def load_state():
 
 def save_state(state):
     try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         for key, value in state.items():
-            postgrest.from_("bot_state").upsert({"key": key, "value": value}).execute()
+            loop.run_until_complete(
+                postgrest.from_("bot_state").upsert({"key": key, "value": value}).execute()
+            )
     except Exception as e:
         st.error(f"❌ Failed to save state to Supabase: {e}")
 
 def log_debug(pair, signal, rsi, macd, macd_signal):
     try:
-        postgrest.from_("debug_log").insert({
-            "timestamp": datetime.now().isoformat(),
-            "pair": pair,
-            "signal": signal,
-            "rsi": rsi,
-            "macd": macd,
-            "macd_signal": macd_signal
-        }).execute()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(
+            postgrest.from_("debug_log").insert({
+                "timestamp": datetime.now().isoformat(),
+                "pair": pair,
+                "signal": signal,
+                "rsi": rsi,
+                "macd": macd,
+                "macd_signal": macd_signal
+            }).execute()
+        )
     except Exception as e:
         st.warning(f"⚠️ Failed to insert debug log: {e}")
 
