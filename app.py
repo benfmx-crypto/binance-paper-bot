@@ -8,7 +8,7 @@ from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
-from postgrest import PostgrestClient  
+from postgrest import PostgrestClient  # ✅ THIS is the correct one
 import httpx
 
 # ======================= CONFIG =======================
