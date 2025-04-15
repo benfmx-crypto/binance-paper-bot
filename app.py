@@ -27,28 +27,30 @@ st.set_page_config(layout="wide")
 st.title("📈 Binance Testnet Live Paper Trading Bot")
 client = Client(API_KEY, API_SECRET, testnet=True)
 
-try:
-    postgrest.from_("debug_log").insert({
-        "timestamp": datetime.now().isoformat(),
-        "pair": "TEST",
-        "time": "manual_test",
-        "latest_macd": 1.23,
-        "latest_signal": 1.11,
-        "latest_rsi": 51.0,
-        "previous_macd": 1.00,
-        "previous_sign": 0.98,
-        "decision": "TEST_WRITE"
-    }).execute()
-    st.success("✅ Manual test write to Supabase succeeded.")
-except Exception as e:
-    st.error(f"❌ Manual test write failed: {e}")
-
-
 headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
 postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1", headers=headers)
 
+# ✅ Manual test insert to debug_log
+try:
+    debug_test = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "pair": "TEST",
+        "time": "00:00:00",
+        "latest_macd": 1.23,
+        "latest_signal": 1.20,
+        "latest_rsi": 55.0,
+        "previous_macd": 1.10,
+        "previous_sign": 1.15,
+        "decision": "BUY"
+    }
+    postgrest.from_("debug_log").insert(debug_test).execute()
+    st.success("✅ Debug log test entry sent to Supabase!")
+except Exception as e:
+    st.error(f"❌ Debug log test failed: {e}")
+
 st.sidebar.success("✅ Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
+
 
 # ======================= SUPABASE LOAD/SAVE =======================
 def load_state():
