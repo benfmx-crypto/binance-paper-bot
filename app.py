@@ -1,4 +1,4 @@
-# Streamlit Trading Bot with Supabase via postgrest-py
+# Streamlit Trading Bot with Supabase via postgrest-py (patched with debug logging)
 
 import streamlit as st
 import pandas as pd
@@ -10,11 +10,6 @@ from streamlit_autorefresh import st_autorefresh
 import altair as alt
 from postgrest import PostgrestClient
 import httpx
-
-if "SUPABASE_URL" not in st.secrets or "SUPABASE_KEY" not in st.secrets:
-    st.error("Supabase secrets missing!")
-    st.stop()
-
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
@@ -58,27 +53,24 @@ def save_state(state):
     except Exception as e:
         st.error(f"❌ Failed to save state to Supabase: {e}")
 
-# Debug log
-
-def log_debug(pair, signal, price, note):
+# ======================= DEBUG LOG =======================
+def log_debug(pair, signal, df):
     try:
+        latest = df.iloc[-1]
+        previous = df.iloc[-2] if len(df) > 1 else df.iloc[-1]
         postgrest.from_("debug_log").insert({
-            "time": datetime.now().isoformat(),
+            "timestamp": datetime.utcnow().isoformat(),
             "pair": pair,
-            "signal": signal,
-            "price": price,
-            "note": note
+            "time": str(latest['time']),
+            "latest_macd": float(latest['MACD']),
+            "latest_signal": float(latest['Signal']),
+            "latest_rsi": float(latest['RSI']),
+            "previous_macd": float(previous['MACD']),
+            "previous_sign": float(previous['Signal']),
+            "decision": signal
         }).execute()
     except Exception as e:
-        st.warning(f"⚠️ Failed to log debug data for {pair}: {e}")
-
-# Load state
-state = load_state()
-st.session_state.capital = state.get("capital", 5000)
-st.session_state.log = state.get("log", [])
-st.session_state.positions = state.get("positions", {})
-st.session_state.equity_log = state.get("equity_log", [])
-st.session_state.pnl_log = state.get("pnl_log", [])
+        st.warning(f"⚠️ Failed to write to debug_log: {e}")
 
 # ======================= STRATEGY =======================
 def generate_signal(df):
@@ -109,6 +101,14 @@ def generate_signal(df):
         return 'EXIT'
     return 'HOLD'
 
+# ======================= STATE =======================
+state = load_state()
+st.session_state.capital = state.get("capital", 5000)
+st.session_state.log = state.get("log", [])
+st.session_state.positions = state.get("positions", {})
+st.session_state.equity_log = state.get("equity_log", [])
+st.session_state.pnl_log = state.get("pnl_log", [])
+
 # ======================= MAIN LOOP =======================
 st.write("### Live Trades")
 st_autorefresh(interval=POLL_INTERVAL * 1000, key="auto-refresh")
@@ -128,12 +128,11 @@ for pair in TRADING_PAIRS:
         continue
 
     signal = generate_signal(df)
+    log_debug(pair, signal, df)
+
     price = df['close'].iloc[-1]
     capital = st.session_state.capital
     size = round((capital * TRADE_PERCENT * LEVERAGE) / price, 3)
-
-    st.write(f"🔍 {pair}: Signal = {signal}, Position = {st.session_state.positions.get(pair, {}).get('side', 'None')}")
-    log_debug(pair, signal, price, st.session_state.positions.get(pair, {}).get('side', 'None'))
 
     if signal == 'BUY' and pair not in st.session_state.positions:
         st.session_state.positions[pair] = {'entry': price, 'qty': size, 'side': 'LONG'}
@@ -186,7 +185,7 @@ st.session_state.equity_log.append({
     'equity': st.session_state.capital
 })
 
-# ======================= SAVE TO SUPABASE =======================
+# Save to Supabase
 save_state({
     "capital": st.session_state.capital,
     "log": st.session_state.log,
@@ -224,4 +223,4 @@ if not pnl_df.empty:
     ).properties(height=300)
     st.altair_chart(pnl_chart, use_container_width=True)
 
-st.caption(f"🔁 Auto-refreshing every 10 seconds. (build check)")
+st.caption(f"🔁 Auto-refreshing every {POLL_INTERVAL} seconds.")
