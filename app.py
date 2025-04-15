@@ -1,4 +1,4 @@
-# Streamlit Trading Bot with Supabase via postgrest-py (patched with debug logging)
+# Streamlit Trading Bot with Supabase via postgrest-py
 
 import streamlit as st
 import pandas as pd
@@ -53,24 +53,32 @@ def save_state(state):
     except Exception as e:
         st.error(f"❌ Failed to save state to Supabase: {e}")
 
-# ======================= DEBUG LOG =======================
-def log_debug(pair, signal, df):
+# ✅ DEBUG LOGGER
+
+def log_debug_signal(pair, df, signal):
     try:
-        latest = df.iloc[-1]
-        previous = df.iloc[-2] if len(df) > 1 else df.iloc[-1]
-        postgrest.from_("debug_log").insert({
-            "timestamp": datetime.utcnow().isoformat(),
+        row = {
+            "timestamp": datetime.now().isoformat(),
             "pair": pair,
-            "time": str(latest['time']),
-            "latest_macd": float(latest['MACD']),
-            "latest_signal": float(latest['Signal']),
-            "latest_rsi": float(latest['RSI']),
-            "previous_macd": float(previous['MACD']),
-            "previous_sign": float(previous['Signal']),
+            "time": df["time"].iloc[-1].isoformat(),
+            "latest_macd": float(df["MACD"].iloc[-1]),
+            "latest_signal": float(df["Signal"].iloc[-1]),
+            "latest_rsi": float(df["RSI"].iloc[-1]),
+            "previous_macd": float(df["MACD"].iloc[-2]),
+            "previous_signal": float(df["Signal"].iloc[-2]),
             "decision": signal
-        }).execute()
+        }
+        postgrest.from_("debug_log").insert(row).execute()
     except Exception as e:
-        st.warning(f"⚠️ Failed to write to debug_log: {e}")
+        st.warning(f"⚠️ Failed to insert debug log: {e}")
+
+# Load state
+state = load_state()
+st.session_state.capital = state.get("capital", 5000)
+st.session_state.log = state.get("log", [])
+st.session_state.positions = state.get("positions", {})
+st.session_state.equity_log = state.get("equity_log", [])
+st.session_state.pnl_log = state.get("pnl_log", [])
 
 # ======================= STRATEGY =======================
 def generate_signal(df):
@@ -101,14 +109,6 @@ def generate_signal(df):
         return 'EXIT'
     return 'HOLD'
 
-# ======================= STATE =======================
-state = load_state()
-st.session_state.capital = state.get("capital", 5000)
-st.session_state.log = state.get("log", [])
-st.session_state.positions = state.get("positions", {})
-st.session_state.equity_log = state.get("equity_log", [])
-st.session_state.pnl_log = state.get("pnl_log", [])
-
 # ======================= MAIN LOOP =======================
 st.write("### Live Trades")
 st_autorefresh(interval=POLL_INTERVAL * 1000, key="auto-refresh")
@@ -128,7 +128,7 @@ for pair in TRADING_PAIRS:
         continue
 
     signal = generate_signal(df)
-    log_debug(pair, signal, df)
+    log_debug_signal(pair, df, signal)
 
     price = df['close'].iloc[-1]
     capital = st.session_state.capital
@@ -185,7 +185,7 @@ st.session_state.equity_log.append({
     'equity': st.session_state.capital
 })
 
-# Save to Supabase
+# ======================= SAVE TO SUPABASE =======================
 save_state({
     "capital": st.session_state.capital,
     "log": st.session_state.log,
