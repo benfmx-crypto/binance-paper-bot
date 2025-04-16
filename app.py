@@ -12,14 +12,15 @@ import asyncio
 import json
 
 # ======================= CONFIG =======================
-API_KEY = st.secrets["API_KEY"]
-API_SECRET = st.secrets["API_SECRET"]
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
+API_SECRET = 'SZTzO0qUanD1mRv3bbKLVZRogeYJuIqjC1hxdW52cX6u8MoaemyTMuuiBx4XIamP'
+SUPABASE_URL = 'https://kfctwbonrbtgmyqlwwzm.supabase.co'
+SUPABASE_KEY = 'your-supabase-service-role-key-here'
 TRADING_PAIRS = ["ETHUSDT", "BTCUSDT", "SOLUSDT", "LINKUSDT"]
 TRADE_PERCENT = 0.25
 LEVERAGE = 2
 POLL_INTERVAL = 10
+
 
 # ======================= HELPERS =======================
 def make_json_serializable(obj):
