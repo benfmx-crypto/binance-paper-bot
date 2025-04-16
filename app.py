@@ -57,7 +57,7 @@ async def main():
     st.title("📈 Binance Testnet Live Paper Trading Bot")
 
     async with AsyncPostgrestClient(f"{SUPABASE_URL}/rest/v1") as postgrest:
-        await postgrest.auth(SUPABASE_KEY)
+        postgrest.auth(SUPABASE_KEY)
 
         # Load State
         async def load_state():
