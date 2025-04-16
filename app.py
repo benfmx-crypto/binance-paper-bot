@@ -9,6 +9,7 @@ from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
 from postgrest import PostgrestClient
+import json
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
@@ -32,6 +33,14 @@ postgrest.auth(SUPABASE_KEY)
 st.sidebar.success("✅ Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
 
+# ======================= UTILS =======================
+def serialize_state(state):
+    def default(o):
+        if isinstance(o, datetime):
+            return o.isoformat()
+        raise TypeError("Type not serializable")
+    return json.loads(json.dumps(state, default=default))
+
 # ======================= SUPABASE LOAD/SAVE =======================
 def load_state():
     try:
@@ -47,28 +56,20 @@ def load_state():
 
 def save_state(state):
     try:
-        safe_state = {}
-        for key, value in state.items():
-            if key in ["equity_log", "pnl_log"]:
-                safe_state[key] = [
-                    {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in entry.items()}
-                    for entry in value
-                ]
-            else:
-                safe_state[key] = value
-            postgrest.from_("bot_state").upsert({"key": key, "value": safe_state[key]}).execute()
+        for key in state:
+            postgrest.from_("bot_state").upsert({"key": key, "value": state[key]}).execute()
     except Exception as e:
         st.error(f"❌ Failed to save state to Supabase: {e}")
 
 def log_debug(pair, signal, rsi, macd, macd_signal):
     try:
-        postgrest.from_("debug_log").insert({
-            "timestamp": datetime.now().isoformat(),
+        postgrest.from_("debug_log").upsert({
             "pair": pair,
+            "timestamp": datetime.now().isoformat(),
             "signal": signal,
-            "rsi": rsi,
-            "macd": macd,
-            "macd_signal": macd_signal
+            "rsi": float(rsi),
+            "macd": float(macd),
+            "macd_signal": float(macd_signal)
         }).execute()
     except Exception as e:
         st.warning(f"⚠️ Failed to insert debug log: {e}")
@@ -80,7 +81,6 @@ st.session_state.log = state.get("log", [])
 st.session_state.positions = state.get("positions", {})
 st.session_state.equity_log = state.get("equity_log", [])
 st.session_state.pnl_log = state.get("pnl_log", [])
-
 
 # ======================= STRATEGY =======================
 def generate_signal(df):
@@ -191,25 +191,26 @@ st.session_state.equity_log.append({
 })
 
 # ======================= SAVE TO SUPABASE =======================
-save_state({
+safe_state = serialize_state({
     "capital": st.session_state.capital,
     "log": st.session_state.log,
     "positions": st.session_state.positions,
     "equity_log": st.session_state.equity_log,
     "pnl_log": st.session_state.pnl_log
 })
+save_state(safe_state)
 
 # ======================= UI =======================
 col1, col2, col3 = st.columns(3)
-col1.metric("\ud83d\udcbc Capital", f"${st.session_state.capital:,.2f}")
-col2.metric("\ud83d\udcca Open Trades", len(st.session_state.positions))
-col3.metric("\ud83d\udcc8 Total Trades", len(st.session_state.log))
+col1.metric("💼 Capital", f"${st.session_state.capital:,.2f}")
+col2.metric("📊 Open Trades", len(st.session_state.positions))
+col3.metric("📈 Total Trades", len(st.session_state.log))
 
 st.write("### Trade Log")
 log_df = pd.DataFrame(st.session_state.log)
 st.dataframe(log_df.tail(20), use_container_width=True)
 
-st.write("### \ud83d\udcc8 Equity Over Time")
+st.write("### 📈 Equity Over Time")
 equity_df = pd.DataFrame(st.session_state.equity_log)
 if not equity_df.empty:
     equity_chart = alt.Chart(equity_df).mark_line().encode(
@@ -218,7 +219,7 @@ if not equity_df.empty:
     ).properties(height=300)
     st.altair_chart(equity_chart, use_container_width=True)
 
-st.write("### \ud83d\udcc9 PnL Per Trade (USDT)")
+st.write("### 📉 PnL Per Trade (USDT)")
 pnl_df = pd.DataFrame(st.session_state.pnl_log)
 if not pnl_df.empty:
     pnl_chart = alt.Chart(pnl_df).mark_bar().encode(
@@ -228,5 +229,4 @@ if not pnl_df.empty:
     ).properties(height=300)
     st.altair_chart(pnl_chart, use_container_width=True)
 
-st.caption(f"\ud83d\udd01 Auto-refreshing every {POLL_INTERVAL} seconds.")
-
+st.caption(f"🔁 Auto-refreshing every {POLL_INTERVAL} seconds.")
