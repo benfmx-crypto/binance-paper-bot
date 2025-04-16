@@ -1,4 +1,4 @@
-# Streamlit Trading Bot with Supabase via postgrest-py
+# Streamlit Trading Bot with Supabase via supabase-py
 
 import streamlit as st
 import pandas as pd
@@ -8,12 +8,12 @@ from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
-from postgrest import PostgrestClient
-import asyncio
+from supabase import create_client, Client as SupabaseClient
+import json
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
-API_SECRET = 'SZTzO0qUanD1mRv3bbKLVZRogeYJuIqjC1hxdW52cX6u8MoaemyTM7Bswgu14ObvYKg'
+API_SECRET = 'SZTzO0qUanD1mRv3bbKLVZRogeYJuIqjC1hxdW52cX6u8MoaemyTMuuiBx4XIamP'
 TRADING_PAIRS = ['ETHUSDT', 'BTCUSDT', 'SOLUSDT', 'LINKUSDT']
 TRADE_PERCENT = 0.25
 LEVERAGE = 2
@@ -27,8 +27,7 @@ st.set_page_config(layout="wide")
 st.title("📈 Binance Testnet Live Paper Trading Bot")
 client = Client(API_KEY, API_SECRET, testnet=True)
 
-postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
-postgrest.auth(SUPABASE_KEY)
+supabase: SupabaseClient = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.sidebar.success("✅ Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
@@ -37,14 +36,10 @@ st.sidebar.write("Pairs:", TRADING_PAIRS)
 def load_state():
     try:
         state = {}
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         for key in ["capital", "log", "positions", "equity_log", "pnl_log"]:
-            res = loop.run_until_complete(
-                postgrest.from_("bot_state").select("value").eq("key", key).execute()
-            )
-            if res and res[1]:
-                state[key] = res[1][0]["value"]
+            res = supabase.table("bot_state").select("value").eq("key", key).execute()
+            if res.data:
+                state[key] = res.data[0]["value"]
         return state
     except Exception as e:
         st.error(f"❌ Failed to load state from Supabase: {e}")
@@ -52,29 +47,21 @@ def load_state():
 
 def save_state(state):
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         for key, value in state.items():
-            loop.run_until_complete(
-                postgrest.from_("bot_state").upsert({"key": key, "value": value}).execute()
-            )
+            supabase.table("bot_state").upsert({"key": key, "value": value}).execute()
     except Exception as e:
         st.error(f"❌ Failed to save state to Supabase: {e}")
 
 def log_debug(pair, signal, rsi, macd, macd_signal):
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(
-            postgrest.from_("debug_log").insert({
-                "timestamp": datetime.now().isoformat(),
-                "pair": pair,
-                "signal": signal,
-                "rsi": rsi,
-                "macd": macd,
-                "macd_signal": macd_signal
-            }).execute()
-        )
+        supabase.table("debug_log").insert({
+            "timestamp": datetime.now().isoformat(),
+            "pair": pair,
+            "signal": signal,
+            "rsi": rsi,
+            "macd": macd,
+            "macd_signal": macd_signal
+        }).execute()
     except Exception as e:
         st.warning(f"⚠️ Failed to insert debug log: {e}")
 
