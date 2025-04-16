@@ -10,6 +10,17 @@ from postgrest import AsyncPostgrestClient
 import aiohttp
 import asyncio
 import json
+import httpx
+from postgrest import AsyncPostgrestClient
+
+# Init HTTPX session and Postgrest client
+session = httpx.AsyncClient(headers={
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json"
+})
+postgrest = AsyncPostgrestClient(f"{SUPABASE_URL}/rest/v1", session=session)
+
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
