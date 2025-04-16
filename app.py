@@ -1,4 +1,4 @@
-# Streamlit Trading Bot with Supabase via supabase-py
+# Streamlit Trading Bot with Supabase via postgrest-py
 
 import streamlit as st
 import pandas as pd
@@ -8,8 +8,7 @@ from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 import altair as alt
-from supabase import create_client, Client as SupabaseClient
-import json
+from postgrest import PostgrestClient
 
 # ======================= CONFIG =======================
 API_KEY = 'vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg'
@@ -27,7 +26,8 @@ st.set_page_config(layout="wide")
 st.title("📈 Binance Testnet Live Paper Trading Bot")
 client = Client(API_KEY, API_SECRET, testnet=True)
 
-supabase: SupabaseClient = create_client(SUPABASE_URL, SUPABASE_KEY)
+postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
+postgrest.auth(SUPABASE_KEY)
 
 st.sidebar.success("✅ Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
@@ -37,8 +37,8 @@ def load_state():
     try:
         state = {}
         for key in ["capital", "log", "positions", "equity_log", "pnl_log"]:
-            res = supabase.table("bot_state").select("value").eq("key", key).execute()
-            if res.data:
+            res = postgrest.from_("bot_state").select("value").eq("key", key).execute()
+            if res and res.data:
                 state[key] = res.data[0]["value"]
         return state
     except Exception as e:
@@ -47,14 +47,22 @@ def load_state():
 
 def save_state(state):
     try:
+        safe_state = {}
         for key, value in state.items():
-            supabase.table("bot_state").upsert({"key": key, "value": value}).execute()
+            if key in ["equity_log", "pnl_log"]:
+                safe_state[key] = [
+                    {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in entry.items()}
+                    for entry in value
+                ]
+            else:
+                safe_state[key] = value
+            postgrest.from_("bot_state").upsert({"key": key, "value": safe_state[key]}).execute()
     except Exception as e:
         st.error(f"❌ Failed to save state to Supabase: {e}")
 
 def log_debug(pair, signal, rsi, macd, macd_signal):
     try:
-        supabase.table("debug_log").insert({
+        postgrest.from_("debug_log").insert({
             "timestamp": datetime.now().isoformat(),
             "pair": pair,
             "signal": signal,
@@ -72,6 +80,7 @@ st.session_state.log = state.get("log", [])
 st.session_state.positions = state.get("positions", {})
 st.session_state.equity_log = state.get("equity_log", [])
 st.session_state.pnl_log = state.get("pnl_log", [])
+
 
 # ======================= STRATEGY =======================
 def generate_signal(df):
@@ -139,7 +148,7 @@ for pair in TRADING_PAIRS:
             'price': price,
             'qty': size,
             'value': capital * TRADE_PERCENT,
-            'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'time': datetime.now().isoformat()
         })
 
     elif signal == 'SHORT' and pair not in st.session_state.positions:
@@ -151,7 +160,7 @@ for pair in TRADING_PAIRS:
             'price': price,
             'qty': size,
             'value': capital * TRADE_PERCENT,
-            'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'time': datetime.now().isoformat()
         })
 
     elif signal == 'EXIT' and pair in st.session_state.positions:
@@ -168,16 +177,16 @@ for pair in TRADING_PAIRS:
             'qty': qty,
             'pnl': pnl,
             'value': capital * TRADE_PERCENT,
-            'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'time': datetime.now().isoformat()
         })
         st.session_state.pnl_log.append({
-            'time': datetime.now(),
+            'time': datetime.now().isoformat(),
             'pnl': pnl
         })
 
 # Log current equity value
 st.session_state.equity_log.append({
-    'time': datetime.now(),
+    'time': datetime.now().isoformat(),
     'equity': st.session_state.capital
 })
 
@@ -192,15 +201,15 @@ save_state({
 
 # ======================= UI =======================
 col1, col2, col3 = st.columns(3)
-col1.metric("💼 Capital", f"${st.session_state.capital:,.2f}")
-col2.metric("📊 Open Trades", len(st.session_state.positions))
-col3.metric("📈 Total Trades", len(st.session_state.log))
+col1.metric("\ud83d\udcbc Capital", f"${st.session_state.capital:,.2f}")
+col2.metric("\ud83d\udcca Open Trades", len(st.session_state.positions))
+col3.metric("\ud83d\udcc8 Total Trades", len(st.session_state.log))
 
 st.write("### Trade Log")
 log_df = pd.DataFrame(st.session_state.log)
 st.dataframe(log_df.tail(20), use_container_width=True)
 
-st.write("### 📈 Equity Over Time")
+st.write("### \ud83d\udcc8 Equity Over Time")
 equity_df = pd.DataFrame(st.session_state.equity_log)
 if not equity_df.empty:
     equity_chart = alt.Chart(equity_df).mark_line().encode(
@@ -209,7 +218,7 @@ if not equity_df.empty:
     ).properties(height=300)
     st.altair_chart(equity_chart, use_container_width=True)
 
-st.write("### 📉 PnL Per Trade (USDT)")
+st.write("### \ud83d\udcc9 PnL Per Trade (USDT)")
 pnl_df = pd.DataFrame(st.session_state.pnl_log)
 if not pnl_df.empty:
     pnl_chart = alt.Chart(pnl_df).mark_bar().encode(
@@ -219,4 +228,5 @@ if not pnl_df.empty:
     ).properties(height=300)
     st.altair_chart(pnl_chart, use_container_width=True)
 
-st.caption(f"🔁 Auto-refreshing every {POLL_INTERVAL} seconds.")
+st.caption(f"\ud83d\udd01 Auto-refreshing every {POLL_INTERVAL} seconds.")
+
