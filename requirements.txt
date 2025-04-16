@@ -5,3 +5,4 @@ numpy
 streamlit-autorefresh
 altair
 supabase
+postgrest-py==0.10.6
