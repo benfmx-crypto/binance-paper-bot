@@ -1,78 +1,88 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime
 from binance.client import Client
 from postgrest import PostgrestClient
+import json
+from datetime import datetime
 
 # ======================= CONFIG =======================
 API_KEY = "vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg"
 API_SECRET = "SZTzO0qUanD1mRv3bbKLVZRogeYJuIqjC1hxdW52cX6u8MoaemyTMuuiBx4XIamP"
 SUPABASE_URL = "https://kfctwbonrbtgmyqlwwzm.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmY3R3Ym9ucmJ0Z215cWx3d3ptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2MzE0OTQsImV4cCI6MjA2MDIwNzQ5NH0.UazxhVhhWQ0YwmB36AY_PKPO_LSVoXwXYsKxTMj7U84"
-TRADING_PAIRS = ["ETHUSDT", "BTCUSDT"]
-INITIAL_CAPITAL = 10000
+
+TRADING_PAIRS = ["ETHUSDT"]
+TRADE_PERCENT = 0.25
+LEVERAGE = 2
+POLL_INTERVAL = 10
 
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
-client = Client(API_KEY, API_SECRET, tld='com', testnet=True)
+
+client = Client(API_KEY, API_SECRET)
 client.API_URL = 'https://testnet.binance.vision/api'
+
 postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
 postgrest.auth(SUPABASE_KEY)
 
-# ======================= SESSION STATE =======================
-if "capital" not in st.session_state:
-    st.session_state.capital = INITIAL_CAPITAL
-    st.session_state.trades = []
-    st.session_state.pnl_log = []
-    st.session_state.positions = {}
-    st.session_state.equity_log = []
-
-# ======================= LOAD STATE =======================
+# ======================= STATE =======================
 def load_state():
     try:
         state = {}
-        keys = ["capital", "trades", "pnl_log", "positions", "equity_log"]
+        keys = ["capital", "trades", "equity_log", "pnl_log", "positions"]
         for key in keys:
             res = postgrest.from_("bot_state").select("value").eq("key", key).execute()
-            state[key] = eval(res["data"][0]["value"])
-        for k, v in state.items():
-            st.session_state[k] = v
+            if res.data:
+                state[key] = json.loads(res.data[0]["value"])
         st.success("✅ State loaded from Supabase")
+        return state
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
+        return {}
 
-# ======================= SAVE STATE =======================
-def save_state():
-    try:
-        for key in ["capital", "trades", "pnl_log", "positions", "equity_log"]:
-            postgrest.from_("bot_state").upsert({"key": key, "value": str(st.session_state[key])}).execute()
-        st.success("✅ State saved to Supabase")
-    except Exception as e:
-        st.error(f"❌ Failed to save state: {e}")
+if "capital" not in st.session_state:
+    db_state = load_state()
+    for key, value in db_state.items():
+        st.session_state[key] = value
+
+# Initialize empty state if it doesn't exist
+if "capital" not in st.session_state:
+    st.session_state.capital = 10000
+if "trades" not in st.session_state:
+    st.session_state.trades = []
+if "equity_log" not in st.session_state:
+    st.session_state.equity_log = []
+if "pnl_log" not in st.session_state:
+    st.session_state.pnl_log = []
+if "positions" not in st.session_state:
+    st.session_state.positions = {}
 
 # ======================= UI =======================
-st.title("📊 Binance Testnet Trading Bot")
-load_state()
+st.title("📈 Binance Testnet Trading Bot")
+st.sidebar.success("✅ Connected to Binance Testnet")
+st.sidebar.write("Trading Pairs:", TRADING_PAIRS)
 
-st.subheader("💼 Portfolio")
-st.write(f"Capital: ${st.session_state.capital:,.2f}")
+# Show capital and equity
+st.metric("💰 Capital", f"${st.session_state.capital:,.2f}")
 
-st.subheader("📈 Trades")
-st.write(pd.DataFrame(st.session_state.trades))
+# Show trade history
+st.subheader("📊 Trade History")
+if st.session_state.trades:
+    st.dataframe(pd.DataFrame(st.session_state.trades))
+else:
+    st.info("No trades recorded yet.")
 
-st.subheader("📉 P&L Log")
-pnl_df = pd.DataFrame(st.session_state.pnl_log)
-if not pnl_df.empty:
+# Show equity log chart
+st.subheader("📉 Equity Over Time")
+if st.session_state.pnl_log:
+    pnl_df = pd.DataFrame(st.session_state.pnl_log)
     pnl_df["time"] = pd.to_datetime(pnl_df["time"])
     st.line_chart(pnl_df.set_index("time")["pnl"])
 else:
     st.info("No P&L data recorded yet.")
 
-if st.button("💾 Save State"):
-    save_state()
-
-if st.button("🔄 Reset State"):
-    for key in ["capital", "trades", "pnl_log", "positions", "equity_log"]:
-        st.session_state[key] = INITIAL_CAPITAL if key == "capital" else []
-    st.success("🔁 State has been reset")
+# ======================= CONTROLS =======================
+st.subheader("⚙️ Controls")
+st.button("🔁 Refresh")
+st.button("🧹 Reset State")
