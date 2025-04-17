@@ -16,13 +16,15 @@ TRADING_PAIRS = ["ETHUSDT", "BTCUSDT"]
 DEFAULT_CAPITAL = 10000
 
 # ======================= INIT SESSION STATE =======================
-for key, default in {
+required_session_keys = {
     "capital": 10000,
     "positions": {},
     "trades": [],
     "pnl_log": [],
     "equity_log": []
-}.items():
+}
+
+for key, default in required_session_keys.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
