@@ -4,6 +4,5 @@ pandas
 numpy
 streamlit-autorefresh
 altair
-supabase
 httpx
 postgrest-py>=1.0.3
