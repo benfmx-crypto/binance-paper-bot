@@ -16,10 +16,12 @@ API_KEY = "vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg"
 API_SECRET = "SZTzO0qUanD1mRv3bbKLVZRogeYJuIqjC1hxdW52cX6u8MoaemyTMuuiBx4XIamP"
 SUPABASE_URL = "https://kfctwbonrbtgmyqlwwzm.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmY3R3Ym9ucmJ0Z215cWx3d3ptIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NDYzMTQ5NCwiZXhwIjoyMDYwMjA3NDk0fQ.teYEmFIPp1hT7lxwWZ1jDwNxR5fA4ErfM2nBvHONrA0"
+
 TRADING_PAIRS = ["ETHUSDT", "BTCUSDT", "SOLUSDT", "LINKUSDT"]
 TRADE_PERCENT = 0.25
 LEVERAGE = 2
-POLL_INTERVAL = 10
+POLL_INTERVAL = 10  # in seconds
+
 
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
