@@ -20,8 +20,9 @@ POLL_INTERVAL = 10
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
 
-client = Client(API_KEY, API_SECRET)
+client = Client(API_KEY, API_SECRET, ping=False)
 client.API_URL = 'https://testnet.binance.vision/api'
+
 
 postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
 postgrest.auth(SUPABASE_KEY)
