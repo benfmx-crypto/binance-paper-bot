@@ -20,6 +20,10 @@ client.API_URL = 'https://testnet.binance.vision/api'
 postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
 postgrest.auth(SUPABASE_KEY)
 
+response = postgrest.from_("trades").select("*").order("timestamp", desc=True).limit(5).execute()
+st.write("Supabase Trades:", response.json())
+
+
 # ======================= SESSION STATE =======================
 if "capital" not in st.session_state:
     st.session_state.capital = INITIAL_CAPITAL
@@ -93,4 +97,6 @@ if st.button("▶️ Simulate Buy ETH"):
         "time": datetime.datetime.now()
     })
     st.success("Simulated ETH Buy Trade!")
+st.write("Current Trades:", st.session_state.trades)
+
 
