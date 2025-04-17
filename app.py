@@ -15,6 +15,17 @@ BINANCE_TESTNET_BASE_URL = "https://testnet.binance.vision/api"
 TRADING_PAIRS = ["ETHUSDT", "BTCUSDT"]
 DEFAULT_CAPITAL = 10000
 
+# ======================= INIT SESSION STATE =======================
+for key, default in {
+    "capital": 10000,
+    "positions": {},
+    "trades": [],
+    "pnl_log": [],
+    "equity_log": []
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
+
 # ========== INIT ==========
 st.set_page_config(layout="wide")
 client = Client(API_KEY, API_SECRET, testnet=True)
