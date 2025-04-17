@@ -1,12 +1,12 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import altair as alt
+import time
+from binance.client import Client
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
-from binance.client import Client
-from postgrest import PostgrestClient
-import json
+import altair as alt
+from postgrest import PostgrestClient  # ✅ Synchronous client only
 
 # ======================= CONFIG =======================
 API_KEY = "vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg"
@@ -14,14 +14,14 @@ API_SECRET = "SZTzO0qUanD1mRv3bbKLVZRogeYJuIqjC1hxdW52cX6u8MoaemyTMuuiBx4XIamP"
 SUPABASE_URL = "https://kfctwbonrbtgmyqlwwzm.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmY3R3Ym9ucmJ0Z215cWx3d3ptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2MzE0OTQsImV4cCI6MjA2MDIwNzQ5NH0.UazxhVhhWQ0YwmB36AY_PKPO_LSVoXwXYsKxTMj7U84"
 
-TRADING_PAIRS = ['ETHUSDT', 'BTCUSDT']
+TRADING_PAIRS = ["ETHUSDT", "BTCUSDT", "SOLUSDT", "LINKUSDT"]
 TRADE_PERCENT = 0.25
 LEVERAGE = 2
-POLL_INTERVAL = 10
+POLL_INTERVAL = 10  # seconds
 
+# ======================= INIT =======================
 st.set_page_config(layout="wide")
-st.title("📈 Binance Testnet Paper Bot")
-
+st.title("📈 Binance Testnet Live Paper Trading Bot")
 client = Client(API_KEY, API_SECRET, testnet=True)
 
 headers = {
@@ -33,14 +33,14 @@ postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1", headers=headers)
 st.sidebar.success("✅ Connected to Binance Testnet")
 st.sidebar.write("Pairs:", TRADING_PAIRS)
 
-# ======================= UTILS =======================
+# ======================= SUPABASE FUNCTIONS =======================
 def load_state():
     try:
         state = {}
         for key in ["capital", "log", "positions", "equity_log", "pnl_log"]:
             res = postgrest.from_("bot_state").select("value").eq("key", key).execute()
-            if res and res.data:
-                state[key] = json.loads(res.data[0]["value"])
+            if res and res["data"]:
+                state[key] = res["data"][0]["value"]
         return state
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
@@ -49,24 +49,24 @@ def load_state():
 def save_state(state):
     try:
         for key, value in state.items():
-            postgrest.from_("bot_state").upsert({"key": key, "value": json.dumps(value, default=str)}).execute()
+            postgrest.from_("bot_state").upsert({"key": key, "value": value}).execute()
     except Exception as e:
-        st.error(f"❌ Failed to save state: {e}")
+        st.error(f"❌ Failed to save state to Supabase: {e}")
 
 def log_debug(pair, signal, rsi, macd, macd_signal):
     try:
         postgrest.from_("debug_log").insert({
             "timestamp": datetime.utcnow().isoformat(),
             "pair": pair,
-            "signal": signal,
-            "rsi": rsi,
-            "macd": macd,
-            "macd_signal": macd_signal
+            "signal": str(signal),
+            "rsi": float(rsi),
+            "macd": float(macd),
+            "macd_signal": float(macd_signal),
         }).execute()
     except Exception as e:
         st.warning(f"⚠️ Failed to insert debug log: {e}")
 
-# ======================= LOAD SESSION =======================
+# Load state
 state = load_state()
 st.session_state.capital = state.get("capital", 5000)
 st.session_state.log = state.get("log", [])
@@ -104,22 +104,28 @@ def generate_signal(df):
     return 'HOLD', df
 
 # ======================= MAIN LOOP =======================
-st_autorefresh(interval=POLL_INTERVAL * 1000, key="refresh")
 st.write("### Live Trades")
+st_autorefresh(interval=POLL_INTERVAL * 1000, key="refresh")
 
 for pair in TRADING_PAIRS:
-    ticker = client.futures_klines(symbol=pair, interval=Client.KLINE_INTERVAL_1MINUTE, limit=100)
-    df = pd.DataFrame(ticker, columns=["time", "open", "high", "low", "close", "volume", "ct", "qav", "trades", "tbv", "tqav", "ignore"])
+    klines = client.futures_klines(symbol=pair, interval=Client.KLINE_INTERVAL_1MINUTE, limit=100)
+    df = pd.DataFrame(klines, columns=["time", "open", "high", "low", "close", "volume", "ct", "qav", "trades", "tbv", "tqav", "ignore"])
     df['close'] = df['close'].astype(float)
+    df['high'] = df['high'].astype(float)
+    df['low'] = df['low'].astype(float)
+    df['volume'] = df['volume'].astype(float)
     df['time'] = pd.to_datetime(df['time'], unit='ms')
     df.dropna(inplace=True)
+
+    if df.empty:
+        st.warning(f"⚠️ Skipping {pair} due to insufficient data.")
+        continue
 
     signal, df = generate_signal(df)
     price = df['close'].iloc[-1]
     macd = df['MACD'].iloc[-1]
     macd_signal = df['Signal'].iloc[-1]
     rsi = df['RSI'].iloc[-1]
-
     log_debug(pair, signal, rsi, macd, macd_signal)
 
     capital = st.session_state.capital
@@ -128,13 +134,17 @@ for pair in TRADING_PAIRS:
     if signal == 'BUY' and pair not in st.session_state.positions:
         st.session_state.positions[pair] = {'entry': price, 'qty': size, 'side': 'LONG'}
         st.session_state.capital -= capital * TRADE_PERCENT
-        st.session_state.log.append({"pair": pair, "side": "BUY", "price": price, "qty": size, "time": datetime.utcnow().isoformat()})
-
+        st.session_state.log.append({
+            'pair': pair, 'side': 'BUY', 'price': price, 'qty': size,
+            'value': capital * TRADE_PERCENT, 'time': datetime.utcnow().isoformat()
+        })
     elif signal == 'SHORT' and pair not in st.session_state.positions:
         st.session_state.positions[pair] = {'entry': price, 'qty': size, 'side': 'SHORT'}
         st.session_state.capital -= capital * TRADE_PERCENT
-        st.session_state.log.append({"pair": pair, "side": "SHORT", "price": price, "qty": size, "time": datetime.utcnow().isoformat()})
-
+        st.session_state.log.append({
+            'pair': pair, 'side': 'SHORT', 'price': price, 'qty': size,
+            'value': capital * TRADE_PERCENT, 'time': datetime.utcnow().isoformat()
+        })
     elif signal == 'EXIT' and pair in st.session_state.positions:
         entry = st.session_state.positions[pair]['entry']
         qty = st.session_state.positions[pair]['qty']
@@ -142,12 +152,17 @@ for pair in TRADING_PAIRS:
         pnl = (price - entry) * qty * LEVERAGE if side == 'LONG' else (entry - price) * qty * LEVERAGE
         st.session_state.capital += (capital * TRADE_PERCENT) + pnl
         del st.session_state.positions[pair]
-        st.session_state.log.append({"pair": pair, "side": "EXIT", "price": price, "qty": qty, "pnl": pnl, "time": datetime.utcnow().isoformat()})
-        st.session_state.pnl_log.append({"time": datetime.utcnow().isoformat(), "pnl": pnl})
+        st.session_state.log.append({
+            'pair': pair, 'side': 'EXIT', 'price': price, 'qty': qty,
+            'pnl': pnl, 'value': capital * TRADE_PERCENT, 'time': datetime.utcnow().isoformat()
+        })
+        st.session_state.pnl_log.append({'time': datetime.utcnow().isoformat(), 'pnl': pnl})
 
-st.session_state.equity_log.append({"time": datetime.utcnow().isoformat(), "equity": st.session_state.capital})
+# Track equity over time
+st.session_state.equity_log.append({
+    'time': datetime.utcnow().isoformat(), 'equity': st.session_state.capital
+})
 
-# Save to Supabase
 save_state({
     "capital": st.session_state.capital,
     "log": st.session_state.log,
@@ -158,21 +173,24 @@ save_state({
 
 # ======================= UI =======================
 col1, col2, col3 = st.columns(3)
-col1.metric("Capital", f"${st.session_state.capital:,.2f}")
-col2.metric("Open Trades", len(st.session_state.positions))
-col3.metric("Total Trades", len(st.session_state.log))
+col1.metric("💼 Capital", f"${st.session_state.capital:,.2f}")
+col2.metric("📊 Open Trades", len(st.session_state.positions))
+col3.metric("📈 Total Trades", len(st.session_state.log))
 
 st.write("### Trade Log")
 st.dataframe(pd.DataFrame(st.session_state.log).tail(20), use_container_width=True)
 
-st.write("### Equity Over Time")
+st.write("### 📈 Equity Over Time")
 equity_df = pd.DataFrame(st.session_state.equity_log)
 if not equity_df.empty:
-    chart = alt.Chart(equity_df).mark_line().encode(x='time:T', y='equity:Q').properties(height=300)
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(alt.Chart(equity_df).mark_line().encode(
+        x='time:T', y='equity:Q'
+    ).properties(height=300), use_container_width=True)
 
-st.write("### PnL History")
+st.write("### 📉 PnL Per Trade")
 pnl_df = pd.DataFrame(st.session_state.pnl_log)
 if not pnl_df.empty:
-    pnl_chart = alt.Chart(pnl_df).mark_bar().encode(x='time:T', y='pnl:Q').properties(height=300)
-    st.altair_chart(pnl_chart, use_container_width=True)
+    st.altair_chart(alt.Chart(pnl_df).mark_bar().encode(
+        x='time:T', y='pnl:Q',
+        color=alt.condition("datum.pnl >= 0", alt.value("green"), alt.value("red"))
+    ).properties(height=300), use_container_width=True)
