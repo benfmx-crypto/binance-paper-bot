@@ -20,8 +20,8 @@ client.API_URL = 'https://testnet.binance.vision/api'
 postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
 postgrest.auth(SUPABASE_KEY)
 
-response = postgrest.from_("trades").select("*").order("timestamp", desc=True).limit(5).execute()
-st.write("Supabase Trades:", response.json())
+response = postgrest.from_("trades").select("*").execute()
+st.write("Supabase Trades:", response.json())  # ✅ Correct
 
 
 # ======================= SESSION STATE =======================
