@@ -21,7 +21,8 @@ postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
 postgrest.auth(SUPABASE_KEY)
 
 response = postgrest.from_("trades").select("*").execute()
-st.write("Supabase Trades:", response.json())  # ✅ Correct
+st.write("Supabase Trades:", response.json()) 
+
 
 
 # ======================= SESSION STATE =======================
