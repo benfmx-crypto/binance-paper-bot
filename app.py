@@ -1,16 +1,17 @@
 import streamlit as st
 from binance.client import Client
-from postgrest import PostgrestClient
+from postgrest_py import PostgrestClient
 import pandas as pd
 import numpy as np
 import datetime
+import os
 
 # ======================= CONFIG =======================
-API_KEY = "vEtqk19OhIzbXrk0pabfyxq7WknP46PeLNDbGPTQlUIeoRYcTM7Bswgu14ObvYKg"
-API_SECRET = "SZTzO0qUanD1mRv3bbKLVZRogeYJuIqjC1hxdW52cX6u8MoaemyTMuuiBx4XIamP"
-SUPABASE_URL = "https://kfctwbonrbtgmyqlwwzm.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmY3R3Ym9ucmJ0Z215cWx3d3ptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2MzE0OTQsImV4cCI6MjA2MDIwNzQ5NH0.UazxhVhhWQ0YwmB36AY_PKPO_LSVoXwXYsKxTMj7U84"
-INITIAL_CAPITAL = float(st.secrets.get("INITIAL_CAPITAL", 10000))
+API_KEY = os.environ["API_KEY"]
+API_SECRET = os.environ["API_SECRET"]
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+INITIAL_CAPITAL = float(os.environ.get("INITIAL_CAPITAL", 10000))
 
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
@@ -29,12 +30,14 @@ if "capital" not in st.session_state:
 def load_state():
     try:
         response = postgrest.from_("bot_state").select("*").execute()
-        result = response.json()
-        for row in result:
-            key = row["key"]
-            value = row["value"]
-            st.session_state[key] = value
-        st.success("✅ State loaded from Supabase")
+        if hasattr(response, "data"):
+            for row in response.data:
+                key = row["key"]
+                value = row["value"]
+                st.session_state[key] = value
+            st.success("✅ State loaded from Supabase")
+        else:
+            st.error(f"❌ Failed to load state: {response}")
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
 
@@ -76,5 +79,3 @@ if col2.button("Simulate SELL ETH"):
         st.session_state.capital += price * qty
         st.session_state.trades.append({"time": now, "pair": "ETH", "side": "SELL", "price": price, "qty": qty, "pnl": pnl})
         del st.session_state.positions["ETH"]
-
-st.write("Available secrets:", st.secrets)
