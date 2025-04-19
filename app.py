@@ -21,10 +21,10 @@ postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
 postgrest.auth(SUPABASE_KEY)
 
 try:
-    payload = [{"key": "test_key", "value": "test_value"}]
-    response = postgrest.from_("bot_state").insert(payload).execute().json()
-    st.success("✅ Test insert succeeded:")
-    st.json(response)
+    response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute()
+    data = response.json()
+    st.success("✅ Test insert succeeded")
+    st.json(data)
 except Exception as e:
     st.error(f"❌ Test insert failed: {e}")
 
