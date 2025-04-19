@@ -76,3 +76,5 @@ if col2.button("Simulate SELL ETH"):
         st.session_state.capital += price * qty
         st.session_state.trades.append({"time": now, "pair": "ETH", "side": "SELL", "price": price, "qty": qty, "pnl": pnl})
         del st.session_state.positions["ETH"]
+
+st.write("Available secrets:", st.secrets)
