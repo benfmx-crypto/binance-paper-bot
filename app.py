@@ -36,7 +36,7 @@ if "capital" not in st.session_state:
 def load_state():
     try:
         response = postgrest.from_("bot_state").select("*").execute()
-        data = response.json()
+        data = response.data
         if isinstance(data, list):
             for row in data:
                 key = row["key"]
