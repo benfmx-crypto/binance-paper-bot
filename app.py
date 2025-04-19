@@ -12,7 +12,6 @@ API_SECRET = os.environ["API_SECRET"]
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 INITIAL_CAPITAL = float(os.environ.get("INITIAL_CAPITAL", 10000))
-
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
 client = Client(API_KEY, API_SECRET, tld="com", testnet=True)
@@ -22,15 +21,10 @@ postgrest.auth(SUPABASE_KEY)
 
 try:
     response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute()
-    data = response.json()
     st.success("✅ Test insert succeeded")
-    st.json(data)
+    st.json(response.data)  # ✅ Correct: use .data not .json()
 except Exception as e:
     st.error(f"❌ Test insert failed: {e}")
-
-response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute().json()
-st.success(f"✅ Inserted to Supabase: {response}")
-
 
 # ======================= SESSION STATE =======================
 if "capital" not in st.session_state:
