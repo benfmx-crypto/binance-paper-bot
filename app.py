@@ -31,7 +31,7 @@ def load_state():
     try:
         response = postgrest.from_("bot_state").select("*").execute()
         data = response.json()
-        if isinstance(data, list):  # Supabase returns list of rows
+        if isinstance(data, list):
             for row in data:
                 key = row["key"]
                 value = row["value"]
@@ -41,8 +41,6 @@ def load_state():
             st.error(f"❌ Unexpected data format: {data}")
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
-
-load_state()
 
 # ======================= UI =======================
 st.title("🧠 ETH/AUD Trading Bot")
