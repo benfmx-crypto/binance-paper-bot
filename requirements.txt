@@ -5,4 +5,5 @@ numpy
 streamlit-autorefresh
 altair
 httpx
-postgrest-py==0.10.6
+postgrest==0.10.6
+
