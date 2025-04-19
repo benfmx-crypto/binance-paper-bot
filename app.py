@@ -28,6 +28,10 @@ try:
 except Exception as e:
     st.error(f"❌ Test insert failed: {e}")
 
+response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute().json()
+st.success(f"✅ Inserted to Supabase: {response}")
+
+
 # ======================= SESSION STATE =======================
 if "capital" not in st.session_state:
     st.session_state.capital = INITIAL_CAPITAL
