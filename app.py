@@ -22,7 +22,7 @@ postgrest.auth(SUPABASE_KEY)
 
 try:
     payload = [{"key": "test_key", "value": "test_value"}]
-    response = postgrest.from_("bot_state").insert(payload).execute()
+    response = postgrest.from_("bot_state").insert(payload).execute().json()
     st.success("✅ Test insert succeeded:")
     st.json(response)
 except Exception as e:
