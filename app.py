@@ -30,14 +30,15 @@ if "capital" not in st.session_state:
 def load_state():
     try:
         response = postgrest.from_("bot_state").select("*").execute()
-        if hasattr(response, "data"):
-            for row in response.data:
+        data = response  # In sync version, this is already a dict
+        if isinstance(data, list):  # Supabase returns list of rows
+            for row in data:
                 key = row["key"]
                 value = row["value"]
                 st.session_state[key] = value
             st.success("✅ State loaded from Supabase")
         else:
-            st.error(f"❌ Failed to load state: {response}")
+            st.error(f"❌ Unexpected data format: {data}")
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
 
