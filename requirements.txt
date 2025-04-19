@@ -1,10 +1,5 @@
-streamlit
-python-binance
-pandas
-numpy
-streamlit-autorefresh
-altair
-httpx
+streamlit==1.24.0
+python-binance==1.0.28
+pandas==2.2.1
+numpy==1.26.4
 postgrest-py==0.10.6
-
-
