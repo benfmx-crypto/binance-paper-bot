@@ -29,15 +29,12 @@ if "capital" not in st.session_state:
 def load_state():
     try:
         response = postgrest.from_("bot_state").select("*").execute()
-        if response.status_code == 200:
-            data = response.json()
-            for row in data:
-                key = row["key"]
-                value = row["value"]
-                st.session_state[key] = value
-            st.success("✅ State loaded from Supabase")
-        else:
-            st.error(f"❌ Failed to load state: {response.status_code}")
+        result = response.json()
+        for row in result:
+            key = row["key"]
+            value = row["value"]
+            st.session_state[key] = value
+        st.success("✅ State loaded from Supabase")
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
 
