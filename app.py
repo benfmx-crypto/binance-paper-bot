@@ -1,6 +1,6 @@
 import streamlit as st
 from binance.client import Client
-from postgrest_py import PostgrestClient
+from postgrest import PostgrestClient
 import pandas as pd
 import numpy as np
 import datetime
