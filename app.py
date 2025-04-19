@@ -12,6 +12,7 @@ API_SECRET = os.environ["API_SECRET"]
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 INITIAL_CAPITAL = float(os.environ.get("INITIAL_CAPITAL", 10000))
+
 # ======================= INIT =======================
 st.set_page_config(layout="wide")
 client = Client(API_KEY, API_SECRET, tld="com", testnet=True)
@@ -20,9 +21,11 @@ postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
 postgrest.auth(SUPABASE_KEY)
 
 try:
-    response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute()
+    response = postgrest.from_("bot_state").insert([
+        {"key": "test_key", "value": "test_value"}
+    ]).execute()
     st.success("✅ Test insert succeeded")
-    st.json(response.data)  # ✅ Correct: use .data not .json()
+    st.json(response)  # postgrest-py==0.10.6 returns a dict
 except Exception as e:
     st.error(f"❌ Test insert failed: {e}")
 
@@ -36,17 +39,18 @@ if "capital" not in st.session_state:
 def load_state():
     try:
         response = postgrest.from_("bot_state").select("*").execute()
-        data = response.data
-        if isinstance(data, list):
-            for row in data:
+        if isinstance(response, dict) and isinstance(response.get("data"), list):
+            for row in response["data"]:
                 key = row["key"]
                 value = row["value"]
                 st.session_state[key] = value
             st.success("✅ State loaded from Supabase")
         else:
-            st.error(f"❌ Unexpected data format: {data}")
+            st.error(f"❌ Unexpected data format: {response}")
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
+
+load_state()
 
 # ======================= UI =======================
 st.title("🧠 ETH/AUD Trading Bot")
@@ -72,7 +76,10 @@ if col1.button("Simulate BUY ETH"):
     qty = 1
     st.session_state.positions["ETH"] = {"entry": price, "qty": qty, "side": "LONG"}
     st.session_state.capital -= price * qty
-    st.session_state.trades.append({"time": now, "pair": "ETH", "side": "BUY", "price": price, "qty": qty, "pnl": 0})
+    st.session_state.trades.append({
+        "time": now, "pair": "ETH", "side": "BUY",
+        "price": price, "qty": qty, "pnl": 0
+    })
 
 if col2.button("Simulate SELL ETH"):
     if "ETH" in st.session_state.positions:
@@ -82,5 +89,8 @@ if col2.button("Simulate SELL ETH"):
         price = 3100
         pnl = (price - entry) * qty
         st.session_state.capital += price * qty
-        st.session_state.trades.append({"time": now, "pair": "ETH", "side": "SELL", "price": price, "qty": qty, "pnl": pnl})
+        st.session_state.trades.append({
+            "time": now, "pair": "ETH", "side": "SELL",
+            "price": price, "qty": qty, "pnl": pnl
+        })
         del st.session_state.positions["ETH"]
