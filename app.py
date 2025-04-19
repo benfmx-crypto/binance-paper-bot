@@ -20,11 +20,10 @@ client.API_URL = 'https://testnet.binance.vision/api'
 postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
 postgrest.auth(SUPABASE_KEY)
 try:
-    response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute().json()
-    st.success("✅ Test insert succeeded:")
-    st.json(response)
-except Exception as e:
-    st.error(f"❌ Test insert failed: {e}")
+response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute()
+st.success("✅ Test insert succeeded:")
+st.json(response)
+
 
 # ======================= SESSION STATE =======================
 if "capital" not in st.session_state:
