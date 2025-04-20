@@ -38,16 +38,16 @@ if "capital" not in st.session_state:
 # ======================= SUPABASE STATE LOAD =======================
 def load_state():
     try:
-        response = postgrest.from_("bot_state").select("*").execute()
-        data = response.get("data", [])
-        if isinstance(data, list):
-            for row in data:
+        res = postgrest.from_("bot_state").select("*").execute()
+        if isinstance(res, dict) and "data" in res:
+            for row in res["data"]:
                 st.session_state[row["key"]] = row["value"]
             st.success("✅ State loaded from Supabase")
         else:
-            st.error("❌ Unexpected data format")
+            st.error(f"❌ Unexpected Supabase response: {res}")
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
+
 
 load_state()
 
