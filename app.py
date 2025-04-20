@@ -17,13 +17,13 @@ INITIAL_CAPITAL = float(os.environ.get("INITIAL_CAPITAL", 10000))
 st.set_page_config(layout="wide")
 client = Client(API_KEY, API_SECRET, tld="com", testnet=True)
 client.API_URL = 'https://testnet.binance.vision/api'
+
 postgrest = PostgrestClient(f"{SUPABASE_URL}/rest/v1")
 postgrest.auth(SUPABASE_KEY)
 
+# ======================= TEST INSERT =======================
 try:
-    response = postgrest.from_("bot_state").insert([
-        {"key": "test_key", "value": "test_value"}
-    ]).execute().json()
+    response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute()
     st.success("✅ Test insert succeeded")
     st.json(response)
 except Exception as e:
@@ -38,17 +38,18 @@ if "capital" not in st.session_state:
 # ======================= SUPABASE STATE LOAD =======================
 def load_state():
     try:
-        response = postgrest.from_("bot_state").select("*").execute().json()
-        if isinstance(response, list):
-            for row in response:
-                key = row["key"]
-                value = row["value"]
-                st.session_state[key] = value
+        response = postgrest.from_("bot_state").select("*").execute()
+        data = response.get("data", [])
+        if isinstance(data, list):
+            for row in data:
+                st.session_state[row["key"]] = row["value"]
             st.success("✅ State loaded from Supabase")
         else:
-            st.error(f"❌ Unexpected data format: {response}")
+            st.error("❌ Unexpected data format")
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
+
+load_state()
 
 # ======================= UI =======================
 st.title("🧠 ETH/AUD Trading Bot")
