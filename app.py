@@ -23,9 +23,9 @@ postgrest.auth(SUPABASE_KEY)
 
 # ======================= TEST INSERT =======================
 try:
-    response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute().json()
+    res = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute().json()
     st.success("✅ Test insert succeeded")
-    st.json(response)
+    st.json(res)
 except Exception as e:
     st.error(f"❌ Test insert failed: {e}")
 
@@ -38,13 +38,13 @@ if "capital" not in st.session_state:
 # ======================= SUPABASE STATE LOAD =======================
 def load_state():
     try:
-        data = postgrest.from_("bot_state").select("*").execute().json()
-        if isinstance(data, list):
-            for row in data:
+        res = postgrest.from_("bot_state").select("*").execute().json()
+        if isinstance(res, list):
+            for row in res:
                 st.session_state[row["key"]] = row["value"]
             st.success("✅ State loaded from Supabase")
         else:
-            st.error(f"❌ Unexpected Supabase response: {data}")
+            st.error(f"❌ Unexpected Supabase response format: {res}")
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
 
