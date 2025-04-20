@@ -52,6 +52,8 @@ def load_state():
 
 load_state()
 
+st.code(type(postgrest.from_("bot_state").select("*").execute()).__name__)
+
 # ======================= UI =======================
 st.title("🧠 ETH/AUD Trading Bot")
 col1, col2 = st.columns(2)
