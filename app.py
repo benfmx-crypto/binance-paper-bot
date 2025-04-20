@@ -23,32 +23,24 @@ postgrest.auth(SUPABASE_KEY)
 
 # ======================= TEST INSERT =======================
 try:
-    res = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute().json()
+    response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute()
     st.success("✅ Test insert succeeded")
-    st.json(res)
+    st.json(response)  # No .json() needed
 except Exception as e:
     st.error(f"❌ Test insert failed: {e}")
-
-# ======================= SESSION STATE =======================
-if "capital" not in st.session_state:
-    st.session_state.capital = INITIAL_CAPITAL
-    st.session_state.trades = []
-    st.session_state.positions = {}
 
 # ======================= SUPABASE STATE LOAD =======================
 def load_state():
     try:
-        res = postgrest.from_("bot_state").select("*").execute().json()
-        if isinstance(res, list):
-            for row in res:
+        res = postgrest.from_("bot_state").select("*").execute()
+        if isinstance(res, dict) and "data" in res:
+            for row in res["data"]:
                 st.session_state[row["key"]] = row["value"]
             st.success("✅ State loaded from Supabase")
         else:
-            st.error(f"❌ Unexpected Supabase response format: {res}")
+            st.error(f"❌ Unexpected Supabase response: {res}")
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
-
-load_state()
 
 # ======================= UI =======================
 st.title("🧠 ETH/AUD Trading Bot")
@@ -92,3 +84,4 @@ if col2.button("Simulate SELL ETH"):
             "price": price, "qty": qty, "pnl": pnl
         })
         del st.session_state.positions["ETH"]
+
