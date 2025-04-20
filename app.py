@@ -39,6 +39,7 @@ if "capital" not in st.session_state:
 def load_state():
     try:
         res = postgrest.from_("bot_state").select("*").execute()
+        data = res["data"]
         if isinstance(res, dict) and "data" in res:
             for row in res["data"]:
                 st.session_state[row["key"]] = row["value"]
