@@ -23,7 +23,7 @@ postgrest.auth(SUPABASE_KEY)
 
 # ======================= TEST INSERT =======================
 try:
-    response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute()
+    response = postgrest.from_("bot_state").insert([{"key": "test_key", "value": "test_value"}]).execute().json()
     st.success("✅ Test insert succeeded")
     st.json(response)
 except Exception as e:
@@ -38,21 +38,17 @@ if "capital" not in st.session_state:
 # ======================= SUPABASE STATE LOAD =======================
 def load_state():
     try:
-        res = postgrest.from_("bot_state").select("*").execute()
-        data = res["data"]
-        if isinstance(res, dict) and "data" in res:
-            for row in res["data"]:
+        data = postgrest.from_("bot_state").select("*").execute().json()
+        if isinstance(data, list):
+            for row in data:
                 st.session_state[row["key"]] = row["value"]
             st.success("✅ State loaded from Supabase")
         else:
-            st.error(f"❌ Unexpected Supabase response: {res}")
+            st.error(f"❌ Unexpected Supabase response: {data}")
     except Exception as e:
         st.error(f"❌ Failed to load state: {e}")
 
-
 load_state()
-
-st.code(type(postgrest.from_("bot_state").select("*").execute()).__name__)
 
 # ======================= UI =======================
 st.title("🧠 ETH/AUD Trading Bot")
